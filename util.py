@@ -1,0 +1,81 @@
+import sys
+import warnings
+
+import numpy as np
+from scipy.stats import rankdata
+
+
+TAB = '    '
+
+class ReprMixin:
+    def __repr__(self):
+        return f'{self.__class__.__name__}\n' + '\n'.join([f'\t{k}: {v}' for k, v in self.__dict__.items()])
+
+
+def _check_param(x):
+    if hasattr(x, '__len__'):
+        if len(x) == 2:
+            return x
+        elif len(x) == 1:
+            return [x[0], x[0]]
+        else:
+            print(f'Something went wrong, parameter array has {len(x)} values')
+    else:
+        return [x, x]
+
+
+def _check_criteria(x):
+    if hasattr(x[0], '__len__'):
+        return x
+    else:
+        return [x, x]
+
+
+def pearson2d(x, y):
+    x, y = np.asarray(x), np.asarray(y)
+    mx, my = np.nanmean(x, axis=-1), np.nanmean(y, axis=-1)
+    xm, ym = x - mx[..., None], y - my[..., None]
+    r_num = np.nansum(xm * ym, axis=-1)
+    r_den = np.sqrt(np.nansum(xm ** 2, axis=-1) * np.nansum(ym ** 2, axis=-1))
+    r = r_num / r_den
+    return r
+
+
+def spearman2d(x, y, axis=0):
+    x, y = np.asarray(x), np.asarray(y)
+    xr, yr = rankdata(x, axis=axis), rankdata(y, axis=axis)
+    mxr, myr = np.nanmean(xr, axis=-1), np.nanmean(yr, axis=-1)
+    xmr, ymr = xr - mxr[..., None], yr - myr[..., None]
+    r_num = np.nansum(xmr * ymr, axis=-1)
+    r_den = np.sqrt(np.nansum(xmr ** 2, axis=-1) * np.nansum(ymr ** 2, axis=-1))
+    r = r_num / r_den
+    return r
+
+
+def weighted_pearson(x, y, w):
+    xf = np.asarray(x).flatten()
+    yf = np.asarray(y).flatten()
+    w = np.asarray(w).flatten() / np.nansum(w)
+    mx = np.nansum(w * xf)
+    my = np.nansum(w * yf)
+
+    r_num = np.nansum(w * (xf - mx) * (yf - my))
+    s_x = np.nansum(w * (xf - mx) ** 2)
+    s_y = np.nansum(w * (yf - my) ** 2)
+    r_den = np.sqrt(s_x * s_y)
+    r = r_num / r_den
+    return r
+
+
+def print_warnings(w):
+    for el in set([w_.message.args[0] for w_ in w]):
+        if 'delta_grad == 0.0' not in el:
+            print('\tWarning: ' + el)
+
+
+def raise_warning_in_catch_block(msg, category, w):
+    warnings.warn(msg, category=category)
+    if len(w):
+        sys.stderr.write(warnings.formatwarning(
+            w[-1].message, w[-1].category, w[-1].filename, w[-1].lineno, line=w[-1].line
+        ))
