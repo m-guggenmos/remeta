@@ -78,3 +78,5 @@ Stats: 3.11 secs, 27 fevs
 Since the dataset is based on simulation, we know the true parameters of the underlying generative model, which are quite close to the fitted parameters.
 
 By default, the model fits parameters for type 1 noise (`noise_sens`) and a type 1 bias (`bias_sens`), as well as metacognitive 'type 2' noise (`noise_meta`) and a confidence slope (`slope_meta`). Moreover, by default the model assumes that metacognitive noise occurs at the stage of the confidence report (setting `meta_noise_type='noisy_report'`), that observers aim at reporting probability correct with their confidence ratings (setting `meta_link_function='probability_correct'`) and that metacognitive noise can be described by a Beta distribution (setting `meta_noise_model='beta'`).
+
+A more detailed guide to use the toolbox is provided in the following Jupyter notebook: [**Basic Usage**](https://github.com/m-guggenmos/remeta/blob/master/demo/basic_usage.ipynb)
