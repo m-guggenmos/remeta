@@ -9,14 +9,14 @@ The purpose of the ReMeta toolbox ("Reverse Engeneering of METAcognition") is th
 
 The following parameters are currently supported:
 
-<u>Type 1 parameters</u>:
+**Type 1 parameters:**
 - `noise_sens`: type 1 noise
 - `bias_sens`: type 1 bias towards one of the two stimulus categories
 - `thresh_sens`: a (sensory) threshold, building on the assumption that a certain minimal stimulus intensity is required to elicit behavior
 - `noise_multi_sens`: multiplicative type 1 noise, i.e. when type 1 noise is assumed to be intensity-dependent
 - `warping`: a nonlinear transducer parameter, allowing for nonlinear transformations of stimulus intensities
 
-<u>Type 2 parameters</u>:
+**Type 2 parameters:**
 - `noise_meta`: metacognitive 'type 2' noise
 - `readout_term_meta`: additive metacognitive bias at the readout of type 1 decision values
 - `confidence slope`: multiplicative metacognitive bias applying to the estimation of type 1 noise
@@ -75,6 +75,6 @@ Final neg. LL: 12911.61
 Stats: 3.11 secs, 27 fevs
 ```
 
-Since the dataset is based on simulation, we know the true parameters of the underlying generative model. As we can see, the model does a good job recovering the original parameters.
+Since the dataset is based on simulation, we know the true parameters of the underlying generative model, which are quite close to the fitted parameters.
 
-By default, the model fits parameters for type 1 noise (`noise_sens`) and a type 1 bias (`bias_sens`), as well as metacognitive 'type 2' noise (`noise_meta`) and a confidence slope (`slope_meta`). Moreover, by default the model assumes that metacognitive noise occurs at the stage of the confidence report (setting `meta_noise_type='noisy_report'`), that observers aim at reporting probability correct with their confidence ratings (setting `meta_link_function='probability_correct'`) and a Beta distribution for metacognitive noise (setting `meta_noise_model='beta'`).
+By default, the model fits parameters for type 1 noise (`noise_sens`) and a type 1 bias (`bias_sens`), as well as metacognitive 'type 2' noise (`noise_meta`) and a confidence slope (`slope_meta`). Moreover, by default the model assumes that metacognitive noise occurs at the stage of the confidence report (setting `meta_noise_type='noisy_report'`), that observers aim at reporting probability correct with their confidence ratings (setting `meta_link_function='probability_correct'`) and that metacognitive noise can be described by a Beta distribution (setting `meta_noise_model='beta'`).
