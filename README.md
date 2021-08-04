@@ -3,7 +3,7 @@ Go directly to:
 
 # ReMeta Toolbox
 
-The purpose of the ReMeta toolbox ("Reverse engineering of METAcognition") is the estimation of certain latent type 1 and type 2 ('metacognitve') parameters underlying the behavior in decision-making tasks. At present, it is primarily focused on perceptual decision-making tasks with exactly two stimulus categories.
+The purpose of the ReMeta toolbox ("Reverse engineering of Metacognition") is the estimation of certain latent type 1 and type 2 ('metacognitve') parameters underlying the behavior in decision-making tasks. At present, it is primarily focused on perceptual decision-making tasks with exactly two stimulus categories.
 
 **Important**: a basic prerequisite for the approach of the toolbox is that there are multiple stimulus intensities per stimulus category!
 
