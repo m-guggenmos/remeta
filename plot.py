@@ -3,7 +3,7 @@ import matplotlib.text as mtext
 import numpy as np
 from matplotlib.lines import Line2D
 from matplotlib.ticker import FormatStrFormatter
-from scipy.stats import gaussian_kde
+from scipy.stats import gaussian_kde, sem
 
 from .gendata import simu_data
 from .dist import get_dist, get_likelihood
@@ -94,7 +94,7 @@ def plot_meta_condensed(ax, s, m, nsamples_gen=1000):
         params_meta = m.model.params_meta
         if '_criteria' in cfg.meta_link_function:
             params_meta['slope_meta'] = [v for k, v in m.model.params_meta.items() if
-                                                     'criterion_meta' in k or 'confidence_level' in k]
+                                         'criterion_meta' in k or 'confidence_level' in k]
         data = m.data.data
         stimuli_norm = data.stimuli_norm
         confidence = data.confidence
@@ -219,20 +219,42 @@ def plot_psychometric(cfg, choices, stimuli, params_sens):
             anot_sens += [f"${symbols[k][1:-1]}={v:{'.0f' if v == 0 else '.3f'}}$"]
     plt.text(1.045, -0.1, r'Parameters:' + '\n' + '\n'.join(anot_sens), transform=plt.gca().transAxes,
              bbox=dict(fc=[1, 1, 1], ec=[0.5, 0.5, 0.5], lw=1, pad=5), fontsize=9)
+    set_fontsize(label=13, tick=11)
+
+    return ax
+
+
+def plot_confidence(stimuli, confidence):
+    ax = plt.gca()
+
+    for v in sorted(np.unique(stimuli)):
+        plt.errorbar(v, np.mean(confidence[stimuli == v]), yerr=sem(confidence[stimuli == v]), marker='o', markersize=5,
+                     mew=1, mec='k', color='None', ecolor='k', mfc=color_data, clip_on=False, elinewidth=1.5,
+                     capsize=5)
+    plt.plot([0, 0], [0, 1], 'k-', lw=0.5)
+    plt.ylim(0, 1)
+    plt.xlabel('Stimulus ($x$)')
+    plt.ylabel('Confidence')
+    set_fontsize(label=13, tick=11)
 
     return ax
 
 
 def plot_link_function(cfg, stimuli, confidence, dv_sens_mode, params_sens, params_meta,
-                       plot_likelihood=True, var_likelihood=None, noise_meta_transformed=None, dv_range=(45, 50, 55),
-                       nsamples_dist=100000, bw=0.03):
+                       plot_likelihood=False, var_likelihood=None, noise_meta_transformed=None, dv_range=(45, 50, 55),
+                       nsamples_gen=1000, nsamples_dist=100000, bw=0.03):
 
     ax = plt.gca()
 
+    generative = simu_data(nsamples_gen, len(stimuli), {**params_sens, **params_meta}, cfg=cfg, stimuli_ext=stimuli,
+                           verbose=False, squeeze=True)
+
     vals_dv = np.unique(dv_sens_mode)
+    vals_dv_gen = np.unique(generative.dv_sens_mode)
     for k in range(2):
 
         vals_dv_ = vals_dv[vals_dv < 0] if k == 0 else vals_dv[vals_dv > 0]
+        vals_dv_gen_ = vals_dv_gen[vals_dv_gen < 0] if k == 0 else vals_dv_gen[vals_dv_gen > 0]
 
         conf_data_means = [np.mean(confidence[dv_sens_mode == v]) for v in vals_dv_]
         conf_data_std_neg = [np.std(confidence[(dv_sens_mode == v) & (confidence < conf_data_means[i])]) for i, v in
@@ -240,10 +262,28 @@ def plot_link_function(cfg, stimuli, confidence, dv_sens_mode, params_sens, para
         conf_data_std_pos = [np.std(confidence[(dv_sens_mode == v) & (confidence >= conf_data_means[i])]) for i, v in
                              enumerate(vals_dv_)]
 
+        conf_gen_means = [np.mean(generative.confidence[generative.dv_sens_mode == v]) for v in vals_dv_gen_]
+        conf_gen_std_neg = [np.std(generative.confidence[
+                                       (generative.dv_sens_mode == v) & (generative.confidence < conf_gen_means[i])])
+                            for i, v in enumerate(vals_dv_gen_)]
+        conf_gen_std_pos = [np.std(generative.confidence[
+                                       (generative.dv_sens_mode == v) & (generative.confidence > conf_gen_means[i])])
+                            for i, v in enumerate(vals_dv_gen_)]
+
         _, cap, barlinecols = plt.errorbar(
-            vals_dv_, conf_data_means, yerr=[conf_data_std_neg, conf_data_std_pos],
+            vals_dv_-0.015, conf_data_means, yerr=[conf_data_std_neg, conf_data_std_pos],
             label='Data: Mean (SD)' if k == 0 else None, marker='o', markersize=7, mew=1, mec='k', color='None',
             ecolor='k', mfc=color_data, clip_on=False, zorder=35, elinewidth=1.5, capsize=5
+        )
+        [cap[i].set_markeredgewidth(1.5) for i in range(len(cap))]
+        [cap[i].set_clip_on(False) for i in range(len(cap))]
+        barlinecols[0].set_clip_on(False)
+
+        _, cap, barlinecols = plt.errorbar(
+            vals_dv_gen_+0.015, conf_gen_means, yerr=[conf_gen_std_neg, conf_gen_std_pos],
+            label='Generative model' if k == 0 else None, marker='o', markersize=7, mew=1, mec=color_generative_meta,
+            color='None', ecolor=color_generative_meta, mfc=color_generative_meta, clip_on=False, zorder=35,
+            elinewidth=1.5, capsize=5
         )
         [cap[i].set_markeredgewidth(1.5) for i in range(len(cap))]
         [cap[i].set_clip_on(False) for i in range(len(cap))]
@@ -310,6 +350,8 @@ def plot_link_function(cfg, stimuli, confidence, dv_sens_mode, params_sens, para
     plt.text(1.045, -0.2, r'Estimated parameters:' + '\n' + '\n'.join(anot_meta), transform=plt.gca().transAxes,
              bbox=dict(fc=[1, 1, 1], ec=[0.5, 0.5, 0.5], lw=1, pad=5), fontsize=9)
 
+    set_fontsize(label=13, tick=11)
+
     return ax
 
 
@@ -318,7 +360,7 @@ def plot_confidence_dist(cfg, stimuli, confidence, params_sens, params_meta, nsa
                          likelihood_weighting=None, dv_range=(45, 50, 55), nsamples_dist=100000, bw=0.03,
                          figure_paper=False):
     generative = simu_data(nsamples_gen, len(stimuli), {**params_sens, **params_meta}, cfg=cfg, stimuli_ext=stimuli,
-                     verbose=False)
+                           verbose=False)
 
     nbins = 20
     levels = np.unique(stimuli)
@@ -420,6 +462,8 @@ def plot_confidence_dist(cfg, stimuli, confidence, params_sens, params_meta, nsa
         plt.legend(bbox_to_anchor=(1.02, 1), loc="upper left", fontsize=9)
     ax.yaxis.grid('on', color=[0.9, 0.9, 0.9], zorder=-10)
 
+    set_fontsize(label=13, tick=11)
+
     return ax
 
 
@@ -435,7 +479,7 @@ def plot_sensory_meta(m, plot_subject_id=False, nsamples_gen=1000, figure_paper=
         params_meta = m.model.params_meta
         if '_criteria' in cfg.meta_link_function:
             params_meta['slope_meta'] = [v for k, v in m.model.params_meta.items() if
-                                                     'criterion_meta' in k or 'confidence_level' in k]
+                                         'criterion_meta' in k or 'confidence_level' in k]
         data = m.data.data
         stimuli_norm = data.stimuli_norm
         choices = data.choices
@@ -508,18 +552,9 @@ def plot_sensory_meta(m, plot_subject_id=False, nsamples_gen=1000, figure_paper=
                       ax3.get_position().width, ax3.get_position().height])
 
 
-def set_fontsize(label=None, xlabel=None, ylabel=None,
-        tick=None, xtick=None, ytick=None,
-        title=None,
-        set=None
-        ):
+def set_fontsize(label=None, xlabel=None, ylabel=None, tick=None, xtick=None, ytick=None, title=None):
 
     fig = plt.gcf()
-
-    if set == 'default':
-        label = 14
-        tick = 12
-        title = 16
 
     for ax in fig.axes:
         if xlabel is not None:

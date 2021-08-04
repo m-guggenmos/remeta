@@ -87,3 +87,4 @@ for k, v in result.model.params_meta.items():
 
 print(f'Negative log-likelihood of true metacognitive parameters: {result.model.fit.fit_meta.negll_true:.1f}')
 print(f'Negative log-likelihood of fitted metacognitive parameters: {result.model.fit.fit_meta.negll:.1f}')
+

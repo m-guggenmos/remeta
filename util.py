@@ -7,6 +7,7 @@ from scipy.stats import rankdata
 
 TAB = '    '
 
+
 class ReprMixin:
     def __repr__(self):
         return f'{self.__class__.__name__}\n' + '\n'.join([f'\t{k}: {v}' for k, v in self.__dict__.items()])
@@ -79,3 +80,34 @@ def raise_warning_in_catch_block(msg, category, w):
         sys.stderr.write(warnings.formatwarning(
             w[-1].message, w[-1].category, w[-1].filename, w[-1].lineno, line=w[-1].line
         ))
+
+
+def type2roc(correct, conf, nbins=5):
+    # Calculate area under type 2 ROC
+    #
+    # correct - vector of 1 x ntrials, 0 for error, 1 for correct
+    # conf - vector of continuous confidence ratings between 0 and 1
+    # nbins - how many bins to use for discretization
+
+    bs = 1 / nbins
+    h2, fa2 = np.full(nbins, np.nan), np.full(nbins, np.nan)
+    for c in range(nbins):
+        if c:
+            h2[nbins - c - 1] = np.sum((conf > c*bs) & (conf <= (c+1)*bs) & correct.astype(bool)) + 0.5
+            fa2[nbins - c - 1] = np.sum((conf > c*bs) & (conf <= (c+1)*bs) & ~correct.astype(bool)) + 0.5
+        else:
+            h2[nbins - c - 1] = np.sum((conf >= c * bs) & (conf <= (c + 1) * bs) & correct.astype(bool)) + 0.5
+            fa2[nbins - c - 1] = np.sum((conf >= c * bs) & (conf <= (c + 1) * bs) & ~correct.astype(bool)) + 0.5
+
+    h2 /= np.sum(h2)
+    fa2 /= np.sum(fa2)
+    cum_h2 = np.hstack((0, np.cumsum(h2)))
+    cum_fa2 = np.hstack((0, np.cumsum(fa2)))
+
+    k = np.full(nbins, np.nan)
+    for c in range(nbins):
+        k[c] = (cum_h2[c+1] - cum_fa2[c])**2 - (cum_h2[c] - cum_fa2[c+1])**2
+
+    auroc2 = 0.5 + 0.25*np.sum(k)
+
+    return auroc2

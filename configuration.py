@@ -5,7 +5,7 @@ from typing import Callable, Dict, Union, List
 import numpy as np
 from scipy.optimize.slsqp import _epsilon  # noqa
 
-from .model import Parameter, ParameterSet
+from .modelspec import Parameter, ParameterSet
 from .util import ReprMixin
 
 
@@ -32,7 +32,7 @@ class Configuration(ReprMixin):
                         'truncated_lognorm', 'truncated_lognorm_varstd'
     meta_link_function : str
         Metacognitive link function. In case of criterion-based link functions {x} refers to the number of criteria.
-        Possible values: 'probability_correct', 'tanh', 'normcdf', 'erf', 'alg', 'guder', 'linear', 'identity',
+        Possible values: 'probability_correct', 'identity', 'tanh', 'normcdf', 'erf', 'alg', 'guder', 'linear',
                          'detection_model_linear', 'detection_model_mean', 'detection_model_mode',
                          'detection_model_full', 'detection_model_ideal'
                          '{x}_criteria', '{x}_criteria_linear', '{x}_criteria_linear_tanh', '{x}_criteria_variable'
@@ -149,7 +149,7 @@ class Configuration(ReprMixin):
 
     *** Transformation functions ***
     function_warping_sens: str
-        Can be one of 'exponential' or 'identity'.
+        Can be one of 'power', 'exponential' or 'identity'.
     function_noise_multi_sens: str
         Can be one of 'linear', 'power', 'exponential' or 'logarithm'.
     function_noise_multi_meta: str

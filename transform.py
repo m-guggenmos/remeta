@@ -8,7 +8,7 @@ from scipy.stats import norm
 from .util import _check_param, _check_criteria
 
 
-def warp(stimuli, warping, warping_function='exponential'):
+def warp(stimuli, warping, warping_function='power'):
     """
     Nonlinear transducing.
 
@@ -20,8 +20,7 @@ def warp(stimuli, warping, warping_function='exponential'):
     warping : float
         Warping factor. Negative (positive) values lead to logarithmic (exponential) transformations of the stimuli.
     warping_function : str
-        Currently only a single warping function is implemented ('exponential'). Pass 'identity' to leave stimuli
-        unchanged.
+        Either 'power' or 'exponential'. Pass 'identity' to leave stimuli unchanged.
 
     Returns
     ----------
@@ -31,6 +30,10 @@ def warp(stimuli, warping, warping_function='exponential'):
     warping_ = _check_param(warping)
     if warping_function == 'identity':
         return stimuli
+    elif warping_function == 'power':
+        stimuli_warped = np.sign(stimuli)
+        stimuli_warped[stimuli < 0] *= np.abs(stimuli[stimuli < 0]) ** warping_[0]
+        stimuli_warped[stimuli >= 0] *= np.abs(stimuli[stimuli >= 0]) ** warping_[1]
     elif warping_function == 'exponential':
         stimuli_warped = np.sign(stimuli)
         if np.abs(warping_[0]) > 1e-10:
@@ -128,14 +131,14 @@ def noise_sens_transform(stimuli, noise_sens=None, noise_multi_sens=None, noise_
         noise_sens_transformed[stimuli >= 0] = noise_sens_[1] + np.abs(stimuli[stimuli >= 0]) ** noise_multi_sens_[1]
     elif noise_multi_sens_function == 'exponential':
         noise_sens_transformed[stimuli < 0] = noise_sens_[0] + \
-                                              np.exp(noise_multi_sens_[0] * np.abs(stimuli[stimuli < 0])) - 1
+            np.exp(noise_multi_sens_[0] * np.abs(stimuli[stimuli < 0])) - 1
         noise_sens_transformed[stimuli >= 0] = noise_sens_[1] + \
-                                               np.exp(noise_multi_sens_[1] * np.abs(stimuli[stimuli >= 0])) - 1
+            np.exp(noise_multi_sens_[1] * np.abs(stimuli[stimuli >= 0])) - 1
     elif noise_multi_sens_function == 'logarithm':
         noise_sens_transformed[stimuli < 0] = noise_sens_[0] + \
-                                              np.log(noise_multi_sens_[0] * np.abs(stimuli[stimuli < 0]) + 1)
+            np.log(noise_multi_sens_[0] * np.abs(stimuli[stimuli < 0]) + 1)
         noise_sens_transformed[stimuli >= 0] = noise_sens_[1] + \
-                                               np.log(noise_multi_sens_[1] * np.abs(stimuli[stimuli >= 0]) + 1)
+            np.log(noise_multi_sens_[1] * np.abs(stimuli[stimuli >= 0]) + 1)
     else:
         raise ValueError(f'{noise_multi_sens_function} is not a valid transform function for noise_intercept_sens')
 

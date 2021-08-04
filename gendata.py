@@ -5,11 +5,11 @@ from .configuration import Configuration
 from .dist import get_dist
 from .transform import warp, noise_meta_transform, noise_sens_transform, \
     link_function
-from .util import _check_param
+from .util import _check_param, TAB, type2roc
 
 
 class Simulation:
-    def __init__(self, nsubjects, nsamples, params, cfg, stimulus_ids, stimuli, choices, dv_sens,
+    def __init__(self, nsubjects, nsamples, params, cfg, stimulus_ids, stimuli, choices, dv_sens, dv_sens_mode,
                  dv_meta, confidence, noise_meta, likelihood_dist=None):
         self.nsubjects = nsubjects
         self.nsamples = nsamples
@@ -22,7 +22,7 @@ class Simulation:
         self.choices = choices
         self.correct = stimulus_ids == choices
         self.dv_sens = dv_sens
-        # self.dv_sens_mode = dv_sens_mode
+        self.dv_sens_mode = dv_sens_mode
         self.dv_meta = dv_meta
         self.confidence = confidence
         self.noise_meta = noise_meta
@@ -78,11 +78,7 @@ def simu_type1_responses(stimuli, params, cfg):
         # dv_sens = np.sign(dv_sens_before_noise) * noise_multi_sens * \
         #     np.arctanh(np.minimum(nchannels-1e-5, nactive) / nchannels)
     else:
-        # dv_sens = dv_sens_before_noise + norm(scale=noise_multi_sens).rvs(size=(nsubjects, nsamples))
-        # dv_sens = dv_sens_before_noise + logistic_dist(scale=noise_multi_sens).rvs(size=stimuli.shape)
-        # dv_sens = dv_sens_before_noise + logistic_dist(scale=noise_multi_sens*np.sqrt(3)/np.pi).rvs(size=stimuli.shape)
         dv_sens = dv_sens_before_noise + logistic_dist(scale=noise_sens * np.sqrt(3) / np.pi).rvs(size=stimuli.shape)
-        # dv_sens[subthresh] = dv_sens[subthresh] * (np.abs(stimuli_final[subthresh]) / params['thresh_sens'])
         choices = (dv_sens >= 0).astype(int)
 
     return choices, stimuli_final, dv_sens, dv_sens_before_noise
@@ -144,7 +140,7 @@ def simu_data(nsubjects, nsamples, params, cfg=None, stimuli_ext=None, verbose=T
     if stimuli_ext is None:
         stimuli = generate_stimuli(nsubjects, nsamples, stepsize=stimuli_stepsize)
     else:
-        stimuli = np.tile(stimuli_ext / np.max(np.abs(stimuli_ext)), (nsubjects, 1)).squeeze()
+        stimuli = np.tile(stimuli_ext / np.max(np.abs(stimuli_ext)), (nsubjects, 1))
     stimulus_ids = (np.sign(stimuli) > 0).astype(int)
     choices, stimuli_final, dv_sens, dv_sens_mode = simu_type1_responses(stimuli, params, cfg)
 
@@ -164,13 +160,13 @@ def simu_data(nsubjects, nsamples, params, cfg=None, stimuli_ext=None, verbose=T
 
             if cfg.enable_noise_meta:
                 noise_meta = noise_meta_transform(
-                    dv_meta_before_noise, dv_sens=dv_sens, stimuli=stimuli,
+                    dv_meta_before_noise, dv_sens=dv_sens,
                     noise_multi_meta_function=cfg.function_noise_multi_meta, **params
                 )
             else:
                 noise_meta = cfg.noise_meta_min
-            dist = get_dist(cfg.meta_noise_model, mode=dv_meta_before_noise, scale=noise_meta, meta_noise_type=cfg.meta_noise_type,
-                            lookup_table=lookup_table)  # noqa
+            dist = get_dist(cfg.meta_noise_model, mode=dv_meta_before_noise, scale=noise_meta,
+                            meta_noise_type=cfg.meta_noise_type, lookup_table=lookup_table)  # noqa
 
             dv_meta = np.maximum(0, dist.rvs((nsubjects, nsamples)))
         else:
@@ -197,8 +193,8 @@ def simu_data(nsubjects, nsamples, params, cfg=None, stimuli_ext=None, verbose=T
                                      f'noise_meta is 0.5 for metacognitive type {cfg.meta_noise_type} and noise model '
                                      f'{cfg.meta_noise_model}')
 
-            dist = get_dist(cfg.meta_noise_model, mode=confidence, scale=noise_meta, meta_noise_type=cfg.meta_noise_type,
-                            lookup_table=lookup_table)
+            dist = get_dist(cfg.meta_noise_model, mode=confidence, scale=noise_meta,
+                            meta_noise_type=cfg.meta_noise_type, lookup_table=lookup_table)
             confidence = np.maximum(0, np.minimum(1, dist.rvs((nsubjects, nsamples))))
 
     if squeeze:
@@ -212,12 +208,20 @@ def simu_data(nsubjects, nsamples, params, cfg=None, stimuli_ext=None, verbose=T
     simulation = Simulation(
         nsubjects=nsubjects, nsamples=nsamples, params=params, cfg=cfg,
         stimulus_ids=stimulus_ids, stimuli=stimuli, choices=choices,
-        dv_sens=dv_sens, dv_meta=dv_meta,
+        dv_sens=dv_sens, dv_sens_mode=dv_sens_mode, dv_meta=dv_meta,
         confidence=confidence,
         noise_meta=noise_meta  # noqa
     )
     if verbose:
-        print(f'\tPerformance: {100 * (stimulus_ids == choices).mean():.2f}')  # noqa
+        print('----------------------------------')
+        print('Basic stats of the simulated data:')
+        correct = (stimulus_ids == choices).astype(int)  # noqa
+        print(f'{TAB}Performance: {100 * np.mean(correct):.1f}% correct')
+        print(f'{TAB}Confidence: {confidence.mean():.2f}')
+        choice_bias = 100*choices.mean()
+        print(f"{TAB}Choice bias: {('-', '+')[choice_bias > 50]}{np.abs(choice_bias - 50):.1f}%")
+        print(f'{TAB}AUROC2: {type2roc(correct, confidence):.2f}')
+        print('----------------------------------')
 
     return simulation
 

@@ -1,5 +1,8 @@
 import pickle
+import numpy as np
 from remeta.gendata import simu_data  # noqa
+
+np.random.seed(1)
 
 params = dict(
     noise_sens=0.4,
