@@ -46,8 +46,8 @@ def simu_type1_responses(stimuli, params, cfg):
     else:
         stimuli_final = stimuli
     if cfg.enable_noise_sens:
-        noise_sens = noise_sens_transform(stimuli=stimuli, noise_multi_sens_function=cfg.function_noise_multi_sens,
-                                          **params)
+        noise_sens = noise_sens_transform(
+            stimuli=stimuli, function_noise_transform_sens=cfg.function_noise_transform_sens, **params)
     else:
         noise_sens = cfg.noise_sens_min
 
@@ -75,7 +75,7 @@ def simu_type1_responses(stimuli, params, cfg):
         dv_sens_before_noise = p_active * nchannels
         dv_sens = nactive
         # if the decision value should be in original space, use this:
-        # dv_sens = np.sign(dv_sens_before_noise) * noise_multi_sens * \
+        # dv_sens = np.sign(dv_sens_before_noise) * noise_transform_sens * \
         #     np.arctanh(np.minimum(nchannels-1e-5, nactive) / nchannels)
     else:
         dv_sens = dv_sens_before_noise + logistic_dist(scale=noise_sens * np.sqrt(3) / np.pi).rvs(size=stimuli.shape)
@@ -85,11 +85,11 @@ def simu_type1_responses(stimuli, params, cfg):
 
 
 def simu_data(nsubjects, nsamples, params, cfg=None, stimuli_ext=None, verbose=True, stimuli_stepsize=0.02,
-              squeeze=False, **kwargs):
+              squeeze=False, force_settings=True, **kwargs):
     if cfg is None:
         # Set configuration attributes that match keyword arguments
         cfg_kwargs = {k: v for k, v in kwargs.items() if k in Configuration.__dict__}
-        cfg = Configuration(force_settings=True, **cfg_kwargs)
+        cfg = Configuration(force_settings=force_settings, **cfg_kwargs)
 
     if cfg.meta_noise_model is None:
         cfg.meta_noise_model = dict(noisy_report='beta', noisy_readout='gamma')[cfg.meta_noise_type]
@@ -103,10 +103,10 @@ def simu_data(nsubjects, nsamples, params, cfg=None, stimuli_ext=None, verbose=T
         lookup_table = None
 
     # Make sure no unwanted parameters have been passed
-    for p in ('warping', 'thresh', 'bias', 'noise_multi'):
+    for p in ('warping', 'thresh', 'bias', 'noise_transform'):
         if not getattr(cfg, f'enable_{p}_sens'):
             params.pop(f'{p}_sens', None)
-    for p in ('readout_term', 'noise_multi', 'scaling', 'slope'):
+    for p in ('readout_term', 'noise_transform', 'scaling', 'slope'):
         if not getattr(cfg, f'enable_{p}_meta'):
             params.pop(f'{p}_meta', None)
     if not cfg.enable_noise_sens:
@@ -161,7 +161,7 @@ def simu_data(nsubjects, nsamples, params, cfg=None, stimuli_ext=None, verbose=T
             if cfg.enable_noise_meta:
                 noise_meta = noise_meta_transform(
                     dv_meta_before_noise, dv_sens=dv_sens,
-                    noise_multi_meta_function=cfg.function_noise_multi_meta, **params
+                    function_noise_transform_meta=cfg.function_noise_transform_meta, **params
                 )
             else:
                 noise_meta = cfg.noise_meta_min
@@ -174,14 +174,15 @@ def simu_data(nsubjects, nsamples, params, cfg=None, stimuli_ext=None, verbose=T
 
         confidence = link_function(
             dv_meta=dv_meta, link_fun=cfg.meta_link_function, dv_sens=dv_sens, stimuli=stimuli_final,
-            noise_multi_sens_function=cfg.function_noise_multi_sens,
+            function_noise_transform_sens=cfg.function_noise_transform_sens,
             **params
         )
 
         if cfg.meta_noise_type == 'noisy_report':
             if cfg.enable_noise_meta:
                 noise_meta = noise_meta_transform(
-                    confidence, dv_sens=dv_sens, noise_multi_meta_function=cfg.function_noise_multi_meta, **params
+                    confidence, dv_sens=dv_sens, function_noise_transform_meta=cfg.function_noise_transform_meta,
+                    **params
                 )
                 noise_meta = np.maximum(cfg.noise_meta_min, noise_meta)
             else:

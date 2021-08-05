@@ -41,7 +41,7 @@ true_params = dict(
     # noise_meta=[0.15, 0.35],
     noise_transform_meta=0.1,
     # noise_transform_meta=[0.15, 0.35],
-    scaling_meta=1.2,
+    scaling_meta=1.1,
     # scaling_meta=[0.9, 1.1],
     slope_meta=0.5,
     # slope_meta=[0.8, 1.2],
@@ -70,12 +70,12 @@ options = dict(
     enable_thresh_sens=0,
     enable_bias_sens=0,
     enable_noise_meta=1,
-    enable_noise_transform_meta=0,
+    enable_noise_transform_meta=1,
     enable_readout_term_meta=0,
     enable_slope_meta=0,
     enable_criteria_meta=0,
     enable_levels_meta=0,
-    enable_scaling_meta=1,
+    enable_scaling_meta=0,
 
     function_warping_sens='power',
     function_noise_transform_sens='multiplicative',
@@ -93,8 +93,8 @@ options = dict(
     # meta_link_function='linear',
     meta_link_function='probability_correct',
     # meta_link_function='probability_correct_ideal',
-    meta_noise_type='noisy_readout',
-    # meta_noise_type='noisy_report',
+    # meta_noise_type='noisy_readout',
+    meta_noise_type='noisy_report',
     # meta_noise_model='truncnorm_2sd_assym',
     meta_noise_model='truncated_norm',
     # meta_noise_model='beta',
@@ -106,8 +106,7 @@ options = dict(
     grid_multiproc=False,
     global_minimization=False,
     skip_meta=False,
-    print_configuration=False,
-    force_settings=True
+    print_configuration=False
 )
 
 print(f"meta_noise_type: {options['meta_noise_type']}")

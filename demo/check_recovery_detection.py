@@ -109,8 +109,8 @@ print(f'AUROC2: {np.mean(auc):.3f} ± {sem(auc):.3f}')
 
 # Reconstruct parameters
 ########################
-# param_names_sens = ('warping_sens', 'noise_multi_sens', 'noise_multi_sens', 'thresh_sens', 'bias_sens')
-# param_names_meta = ('noise_meta', 'noise_multi_meta', 'slope_meta', 'readout_term_meta')
+# param_names_sens = ('warping_sens', 'noise_transform_sens', 'noise_transform_sens', 'thresh_sens', 'bias_sens')
+# param_names_meta = ('noise_meta', 'noise_transform_meta', 'slope_meta', 'readout_term_meta')
 fit_vars_sens = ('success_sens', 'execution_time_sens')
 fit_vars_meta = ('success_meta', 'execution_time_meta')
 other_vars = ('ll_sens', 'll_sens_true', 'll_meta', 'll_meta_true', 'mae_confratings', 'best_link_function')

@@ -53,19 +53,19 @@ class Configuration(ReprMixin):
         `function_warping_sens`).
     enable_noise_sens : int (default: 1)
         Fit separate sensory noise parameters for both stimulus categories.
-    enable_noise_multi_sens : int (default: 0)
-        Fit a multiplicative sensory noise parameter (the multiplicative noise function is defined via
-        `function_noise_multi_sens`).
+    enable_noise_transform_sens : int (default: 0)
+        Fit an additional sensory noise parameter for signal-dependent sensory noise (the type of dependency is is
+        defined via `function_noise_transform_sens`).
     enable_thresh_sens : int (default: 0)
         Fit a sensory threshold.
     enable_bias_sens : int (default: 1)
         Fit a sensory bias towards one of the stimulus categories.
     enable_noise_meta : int (default: 1)
         Fit a metacognitive noise parameter
-    enable_noise_multi_meta : int (default: 0)
-        Fit a multiplicative metacognitive noise parameter (the multiplicative noise function is defined via
-        `function_noise_multi_meta`). Note: at present, enable_noise_multi_meta=2 leads to biased results is therefore
-        discouraged.
+    enable_noise_transform_meta : int (default: 0)
+        Fit an additional metacognitive noise parameter for signal-dependent metacognitive noise (the type of dependency
+        is is defined via `function_noise_transform_meta`). Note: at present, enable_noise_transform_meta=2 leads to
+        biased results and is therefore discouraged.
     enable_readout_term_meta : int (default: 0)
         Fit an additive metacognitive bias at readout.
     enable_slope_meta : int (default: 0)
@@ -99,7 +99,7 @@ class Configuration(ReprMixin):
         Parameter for the nonlinear transducer.
     noise_sens : Union[Parameter, List[Parameter]]
         Parameter for sensory noise.
-    noise_multi_sens : Union[Parameter, List[Parameter]]
+    noise_transform_sens : Union[Parameter, List[Parameter]]
         Parameter for multiplicative sensory noise.
     thresh_sens : Union[Parameter, List[Parameter]]
         Parameter for the sensory threshold.
@@ -107,7 +107,7 @@ class Configuration(ReprMixin):
         Parameter for the sensory bias.
     noise_meta : Union[Parameter, List[Parameter]]
         Parameter for metacognitive noise.
-    noise_multi_meta : Union[Parameter, List[Parameter]]
+    noise_transform_meta : Union[Parameter, List[Parameter]]
         Parameter for multiplicative megacognitive noise.
     readout_term_meta : Union[Parameter, List[Parameter]]
         Parameter for the metacognitive readout term.
@@ -150,10 +150,10 @@ class Configuration(ReprMixin):
     *** Transformation functions ***
     function_warping_sens: str
         Can be one of 'power', 'exponential' or 'identity'.
-    function_noise_multi_sens: str
-        Can be one of 'linear', 'power', 'exponential' or 'logarithm'.
-    function_noise_multi_meta: str
-        Can be one of 'linear', 'power', 'exponential' or 'logarithm'.
+    function_noise_transform_sens: str
+        Can be one of 'multiplicative', 'power', 'exponential' or 'logarithm'.
+    function_noise_transform_meta: str
+        Can be one of 'multiplicative', 'power', 'exponential' or 'logarithm'.
 
     *** Preprocessing ***
     normalize_stimuli_by_max : bool
@@ -193,11 +193,11 @@ class Configuration(ReprMixin):
 
     enable_warping_sens: int = 0
     enable_noise_sens: int = 1
-    enable_noise_multi_sens: int = 0
+    enable_noise_transform_sens: int = 0
     enable_thresh_sens: int = 0
     enable_bias_sens: int = 1
     enable_noise_meta: int = 1
-    enable_noise_multi_meta: int = 0
+    enable_noise_transform_meta: int = 0
     enable_readout_term_meta: int = 0
     enable_slope_meta: int = 1
     enable_scaling_meta: int = 0
@@ -209,11 +209,11 @@ class Configuration(ReprMixin):
 
     warping_sens: Union[Parameter, List[Parameter]] = None
     noise_sens: Union[Parameter, List[Parameter]] = None
-    noise_multi_sens: Union[Parameter, List[Parameter]] = None
+    noise_transform_sens: Union[Parameter, List[Parameter]] = None
     thresh_sens: Union[Parameter, List[Parameter]] = None
     bias_sens: Union[Parameter, List[Parameter]] = None
     noise_meta: Union[Parameter, List[Parameter]] = None
-    noise_multi_meta: Union[Parameter, List[Parameter]] = None
+    noise_transform_meta: Union[Parameter, List[Parameter]] = None
     readout_term_meta: Union[Parameter, List[Parameter]] = None
     slope_meta: Union[Parameter, List[Parameter]] = None
     scaling_meta: Union[Parameter, List[Parameter]] = None
@@ -222,8 +222,8 @@ class Configuration(ReprMixin):
     constraints_meta_callable: Callable = None
 
     function_warping_sens: str = 'exponential'
-    function_noise_multi_sens: str = 'linear'
-    function_noise_multi_meta: str = 'linear'
+    function_noise_transform_sens: str = 'linear'
+    function_noise_transform_meta: str = 'linear'
 
     gridsearch: bool = True
     fine_gridsearch: bool = False
@@ -248,12 +248,13 @@ class Configuration(ReprMixin):
     noise_meta_min: float = 0.001
 
     _warping_sens_default: Parameter = Parameter(guess=0.1, bounds=(-10, 10), grid_range=np.arange(-10, 11, 5))
-    _noise_multi_sens_default: Parameter = Parameter(guess=0, bounds=(-10, 10), grid_range=np.arange(-1, 1.1, 0.5))
+    _noise_transform_sens_default: Parameter = Parameter(guess=0, bounds=(0, 10), grid_range=np.arange(0, 1.1, 0.25))
     _noise_sens_default: Parameter = Parameter(guess=0.1, bounds=(1e-3, 10), grid_range=np.arange(0.1, 0.9, 0.25))
     _thresh_sens_default: Parameter = Parameter(guess=0, bounds=(0, 1), grid_range=np.arange(0, 0.41, 0.2))
     _bias_sens_default: Parameter = Parameter(guess=0, bounds=(-1, 1), grid_range=np.arange(-0.1, 0.11, 0.1))
     _noise_meta_default: Parameter = Parameter(guess=0.2, bounds=(0, 5), grid_range=np.arange(0.05, 1, 0.1))
-    _noise_multi_meta_default: Parameter = Parameter(guess=0, bounds=(-10, 10), grid_range=np.arange(-0.4, 0.41, 0.2))
+    _noise_transform_meta_default: Parameter = Parameter(guess=0, bounds=(0, 10),
+                                                         grid_range=np.arange(0, 1.1, 0.25))
     _readout_term_meta_default: Parameter = Parameter(guess=0, bounds=(-1, 1), grid_range=np.arange(-0.2, 0.21, 0.1))
     _slope_meta_default: Parameter = Parameter(guess=1, bounds=(0.1, 50), grid_range=np.arange(0.2, 1.71, 0.3))
     _scaling_meta_default: Parameter = Parameter(guess=1, bounds=(0.1, 10), grid_range=np.arange(0.5, 2.01, 0.3))
@@ -287,56 +288,59 @@ class Configuration(ReprMixin):
             self.print()
 
     def _check_compatibility(self):
-        if self.enable_noise_multi_meta == 2:
-            warnings.warn('Fitting separate multiplicative metacognitive noise parameters for the two stimulus '
-                          'categories leads to biased estimates (for currently unknown reasons) and is thus '
-                          'discouraged.')
+        if self.enable_noise_transform_meta:
+            text = 'Fitting signal-dependent metacognitive noise parameters leads to biased estimates (for currently ' \
+                   'unknown reasons) and is thus discouraged.'
+            if self.force_settings:
+                warnings.warn(text)
+            else:
+                raise ValueError(text)
+        # if self.enable_noise_transform_meta == 2:
+        #     warnings.warn('Fitting separate signal-dependent metacognitive noise parameters for the two stimulus '
+        #                   'categories leads to biased estimates (for currently unknown reasons) and is thus '
+        #                   'discouraged.')
 
         if self.detection_model and 'detection_model' not in self.meta_link_function:
             raise ValueError('Detection Models require a compatible metacogntive link function. Choose one of: '
                              'detection_model_linear, detection_model_mean, detection_model_mode, '
                              'detection_model_full, detection_model_ideal')
 
-        if self.enable_criteria_meta and self.enable_slope_meta:
-            self.enable_slope_meta = 0
-            warnings.warn('Confidence criteria were enabled, which is in conflict with enable_slope_meta > 0 -> '
-                          'auto-setting enable_slope_meta = 0.')
         if not self.enable_criteria_meta and '_criteria' in self.meta_link_function:
             raise ValueError('A criterion-based link function was set, but confidence criteria were not enabled.')
-        if self.enable_criteria_meta and '_criteria' not in self.meta_link_function:
-            self.enable_criteria_meta = 0
-            warnings.warn('Confidence criteria were enabled but no criterion-based link function was set -> '
-                          'auto-setting enable_criteria_meta = 0.')
-        if self.enable_levels_meta and '_criteria' not in self.meta_link_function:
-            self.enable_levels_meta = 0
-            warnings.warn('Confidence criteria were enabled but no criterion-based link function was set -> '
-                          'auto-setting enable_levels_meta = 0.')
-        if self.enable_levels_meta and not self.enable_criteria_meta:
-            self.enable_criteria_meta = self.enable_levels_meta
-            warnings.warn(f'Confidence leves were enabled, but confidence criteria not -> auto-setting'
-                          f'enable_criteria_meta = {self.enable_levels_meta}')
-
-        if (self.meta_noise_type == 'noisy_readout') and self.enable_scaling_meta:
-            text = 'Models of type noisy-readout are incompatible with enable_scaling_meta=True'
-            if self.force_settings:
-                warnings.warn(text)
-            else:
-                raise ValueError(text)
 
         if not self.settings_ignore_warnings:
-            if self.enable_slope_meta and self.enable_scaling_meta:
+            if self.enable_slope_meta and self.enable_scaling_meta and not self.force_settings:
                 warnings.warn('The combination enable_slope_meta=True and enable_scaling_meta=True likely '
                               'leads to imprecise estimates.')
+            if self.enable_criteria_meta and '_criteria' not in self.meta_link_function:
+                self.enable_criteria_meta = 0
+                warnings.warn('Confidence criteria were enabled but no criterion-based link function was set -> '
+                              'auto-setting enable_criteria_meta = 0.')
+            if self.enable_levels_meta and '_criteria' not in self.meta_link_function:
+                self.enable_levels_meta = 0
+                warnings.warn('Confidence criteria were enabled but no criterion-based link function was set -> '
+                              'auto-setting enable_levels_meta = 0.')
+            if self.enable_levels_meta and not self.enable_criteria_meta:
+                self.enable_criteria_meta = self.enable_levels_meta
+                warnings.warn(f'Confidence leves were enabled, but confidence criteria not -> auto-setting'
+                              f'enable_criteria_meta = {self.enable_levels_meta}')
 
-        if (self.enable_noise_sens == 2) and self.enable_noise_multi_sens:
-            raise ValueError('Setting enable_noise_sens_duplex=True and enable_noise_multi_sens=True at the same '
-                             'time is currently not supported')
+            if (self.meta_noise_type == 'noisy_readout') and self.enable_scaling_meta:
+                warnings.warn('The setting enable_scaling_meta has been enabled for a model of type noisy-readout. '
+                              'Use this only if you have strong reasons to belief that values of the confidence '
+                              'scaling parameter are <= 1, since true values > 1 cannot be recovered for noisy-readout '
+                              'models.')
+
+            if self.enable_criteria_meta and self.enable_slope_meta:
+                self.enable_slope_meta = 0
+                warnings.warn('Confidence criteria were enabled, which is in conflict with enable_slope_meta > 0 -> '
+                              'auto-setting enable_slope_meta = 0.')
 
     def _prepare_params_sens(self):
         if self.paramset_sens is None:
 
             param_names_sens = []
-            params_sens = ('warping', 'noise', 'noise_multi', 'thresh', 'bias')
+            params_sens = ('warping', 'noise', 'noise_transform', 'thresh', 'bias')
             for param in params_sens:
                 if getattr(self, f'enable_{param}_sens'):
                     param_names_sens += [f'{param}_sens']
@@ -365,7 +369,7 @@ class Configuration(ReprMixin):
                     self._noise_meta_default.bounds = (0, 250)
 
             param_names_meta = []
-            params_meta = ('noise', 'noise_multi', 'readout_term', 'slope', 'scaling')
+            params_meta = ('noise', 'noise_transform', 'readout_term', 'slope', 'scaling')
             for param in params_meta:
                 if getattr(self, f'enable_{param}_meta'):
                     param_names_meta += [f'{param}_meta']
@@ -421,7 +425,7 @@ class Configuration(ReprMixin):
 
 def _constraints_sens_default(remeta):
     constraints = []
-    if remeta.cfg.enable_noise_multi_sens:
+    if remeta.cfg.enable_noise_transform_sens:
         constraints += [{'type': 'ineq', 'fun': lambda x: np.min(remeta._negll_sens(x, return_noise=True)) - 0.001}]  # noqa
     return constraints
 
@@ -432,7 +436,7 @@ def _constraints_meta_default(remeta):
     # Set constraints for the metacognitive noise slope
     # Note that metacognitive noise is based on confidence in case of the noisy-report model and
     # on metacognitive decision values in case of the noisy-readout model
-    if remeta.cfg.enable_noise_multi_meta:
+    if remeta.cfg.enable_noise_transform_meta:
         constraints += [{'type': 'ineq', 'fun': lambda x: np.min(remeta.fun_meta(x, return_noise=True,
                                                                                  constraint_mode=True)) - 0.001}]
 

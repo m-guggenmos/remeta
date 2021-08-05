@@ -13,7 +13,7 @@ The following parameters are currently supported:
 - `noise_sens`: type 1 noise
 - `bias_sens`: type 1 bias towards one of the two stimulus categories
 - `thresh_sens`: a (sensory) threshold, building on the assumption that a certain minimal stimulus intensity is required to elicit behavior
-- `noise_multi_sens`: multiplicative type 1 noise, i.e. when type 1 noise is assumed to be intensity-dependent
+- `noise_transform_sens`: parameter to specify stimulus-dependent type 1 noise (e.g. multiplicative noise)
 - `warping`: a nonlinear transducer parameter, allowing for nonlinear transformations of stimulus intensities
 
 **Type 2 parameters:**
@@ -21,7 +21,7 @@ The following parameters are currently supported:
 - `readout_term_meta`: additive metacognitive bias at the readout of type 1 decision values
 - `confidence slope`: multiplicative metacognitive bias applying to the estimation of type 1 noise
 - `confidence scaling`: multiplicative metacognitive bias applying to confidence reports
-- `noise_multi_meta`: multiplicative type 2 noise, i.e. when metacognitive noise is assumed to be dependent on the absolute value of type 1 decision values
+- `noise_transform_meta`: parameter to specify decision-value-dependent type 2 noise (e.g. multiplicative noise)
 - `criterion{i}_meta`: i-th confidence criterion (in case of a criterion-based link function)
 - `level{i}_meta`: i-th confidence level (in case of a criterion-based link function, confidence levels correspond to the confidence at the respective criteria)
 

@@ -441,7 +441,7 @@ class ReMeta:
         self.model.confidence = self._link_function(dv_meta_considered, params_meta, criteria_meta=criteria_meta,
                                                     levels_meta=levels_meta, constraint_mode=constraint_mode)
 
-        noise_meta = self._noise_meta_transform(dv_meta_considered, params_meta, ignore_warnings=ignore_warnings)
+        noise_meta = self._noise_meta_transform(self.model.confidence, params_meta, ignore_warnings=ignore_warnings)
         if return_noise:
             return noise_meta
         if (self.cfg.meta_noise_model == 'beta_spread') and np.any(noise_meta > 0.5):
@@ -477,7 +477,6 @@ class ReMeta:
         else:
             likelihood = dist.cdf(np.minimum(1, self.data.confidence_2d + binsize)) - \
                          dist.cdf(np.maximum(0, self.data.confidence_2d - binsize))
-            # likelihood = dist.pdf(self.data.confidence_2d)
             if final:
                 likelihood_pdf = dist.pdf(self.data.confidence_2d)
 
@@ -512,7 +511,7 @@ class ReMeta:
             if params_sens is None:
                 params_sens = self.model.params_sens
             return noise_sens_transform(
-                stimuli=stimuli, noise_multi_sens_function=self.cfg.function_noise_multi_sens, **params_sens
+                stimuli=stimuli, function_noise_transform_sens=self.cfg.function_noise_transform_sens, **params_sens
             )
         else:
             return self.cfg.noise_sens_min
@@ -524,7 +523,7 @@ class ReMeta:
         if self.cfg.enable_noise_meta:
             noise_meta_transformed = noise_meta_transform(
                 confidence_or_dv_meta=confidence_or_dv_meta, dv_sens=self.model.dv_sens_considered,
-                noise_multi_meta_function=self.cfg.function_noise_multi_meta,
+                function_noise_transform_meta=self.cfg.function_noise_transform_meta,
                 ignore_warning=ignore_warnings,  # noqa
                 **self.model.params_sens, **params_meta
             )
@@ -538,7 +537,7 @@ class ReMeta:
         """
         return link_function(
             dv_meta=dv_meta, link_fun=self.cfg.meta_link_function, dv_sens=self.model.dv_sens_considered,
-            stimuli=self.model.stimuli_final, noise_multi_sens_function=self.cfg.function_noise_multi_sens,
+            stimuli=self.model.stimuli_final, function_noise_transform_sens=self.cfg.function_noise_transform_sens,
             nchannels=self.cfg.detection_model_nchannels, criteria_meta=criteria_meta, levels_meta=levels_meta,
             constraint_mode=constraint_mode,
             **self.model.params_sens, **params_meta
@@ -550,7 +549,7 @@ class ReMeta:
         """
         return link_function_inv(
             confidence=confidence, link_fun=link_fun, stimuli=self.model.stimuli_final,
-            dv_sens=self.model.dv_sens_considered, noise_multi_sens_function=self.cfg.function_noise_multi_sens,
+            dv_sens=self.model.dv_sens_considered, function_noise_transform_sens=self.cfg.function_noise_transform_sens,
             nchannels=self.cfg.detection_model_nchannels, criteria_meta=criteria_meta, levels_meta=levels_meta,
             **self.model.params_sens, **params_meta
         )
@@ -601,15 +600,15 @@ class ReMeta:
             # signs = np.sign(dv_sens_mode)
             # dv_sens_range = np.linspace(0, np.abs(dv_sens_mode.flatten()) +
             #                             self.cfg.max_dv_deviation, int((self.cfg.nbins_dv))).T
-            # self.model.dv_sens_considered = signs * dv_sens_range * noise_multi_sens
-            # p_active_considered = np.tanh(np.abs(self.model.dv_sens_considered) / noise_multi_sens)
+            # self.model.dv_sens_considered = signs * dv_sens_range * noise_transform_sens
+            # p_active_considered = np.tanh(np.abs(self.model.dv_sens_considered) / noise_transform_sens)
             # nactive_considered = p_active_considered * nchannels
             # self.model.dv_sens_pmf = binom(nchannels, p_active).pmf(np.round(nactive_considered).astype(int))
 
             # signs = np.sign(dv_sens_mode)
             # dv_sens_mode = signs * p_active * nchannels
             # nactive_considered = np.tile(np.arange(0, nchannels+1), (len(dv_sens_mode), 1))
-            # self.model.dv_sens_considered = signs * noise_multi_sens * \
+            # self.model.dv_sens_considered = signs * noise_transform_sens * \
             #                                 np.arctanh(np.minimum(nchannels-1e-5, nactive_considered) / nchannels)
             # self.model.dv_sens_pmf = binom(nchannels, p_active).pmf(nactive_considered)
 

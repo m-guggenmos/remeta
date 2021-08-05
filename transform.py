@@ -93,10 +93,10 @@ def logistic_inv(posterior, noise_sens):
     return x
 
 
-def noise_sens_transform(stimuli, noise_sens=None, noise_multi_sens=None, noise_multi_sens_function='linear',
-                         **kwargs):  # noqa
+def noise_sens_transform(stimuli, noise_sens=None, noise_transform_sens=None, thresh_sens=None,
+                         function_noise_transform_sens='multiplicative', **kwargs):  # noqa
     """
-    Multiplicative sensory noise transformation.
+    Sensory noise transformation.
 
     Parameters
     ----------
@@ -105,10 +105,12 @@ def noise_sens_transform(stimuli, noise_sens=None, noise_multi_sens=None, noise_
         codes the intensity. Must be normalized to [-1; 1].
     noise_sens : float or array-like
         Sensory noise parameter.
-    noise_multi_sens : float or array-like
-        Multiplicative sensory noise parameter.
-    noise_multi_sens_function : array-like
-        Multiplicative noise type. One of 'linear', 'power', 'exponential', 'logarithm'
+    noise_transform_sens : float or array-like
+        Signal-dependent sensory noise parameter.
+    thresh_sens: float or array-like
+        Sensory threshold.
+    function_noise_transform_sens : str
+        Define the signal dependency of sensory noise. One of 'multiplicative', 'power', 'exponential', 'logarithm'.
     kwargs : dict
         Conveniance parameter to avoid an error if irrelevant parameters are passed.
 
@@ -118,40 +120,45 @@ def noise_sens_transform(stimuli, noise_sens=None, noise_multi_sens=None, noise_
         Sensory noise array of shape stimuli.shape. Each stimulus is assigned a sensory noise parameter.
     """
     noise_sens_ = _check_param(noise_sens)
-    noise_multi_sens_ = _check_param(noise_multi_sens)
+    noise_transform_sens_ = _check_param(noise_transform_sens)
+    thresh_sens_ = (0, 0) if thresh_sens is None else _check_param(thresh_sens)
     noise_sens_transformed = np.ones(stimuli.shape)
-    if noise_multi_sens is None:
-        noise_sens_transformed[stimuli < 0] *= noise_sens_[0]
-        noise_sens_transformed[stimuli >= 0] *= noise_sens_[1]
-    elif noise_multi_sens_function == 'linear':
-        noise_sens_transformed[stimuli < 0] = noise_sens_[0] + np.abs(stimuli[stimuli < 0]) * noise_multi_sens_[0]
-        noise_sens_transformed[stimuli >= 0] = noise_sens_[1] + np.abs(stimuli[stimuli >= 0]) * noise_multi_sens_[1]
-    elif noise_multi_sens_function == 'power':
-        noise_sens_transformed[stimuli < 0] = noise_sens_[0] + np.abs(stimuli[stimuli < 0]) ** noise_multi_sens_[0]
-        noise_sens_transformed[stimuli >= 0] = noise_sens_[1] + np.abs(stimuli[stimuli >= 0]) ** noise_multi_sens_[1]
-    elif noise_multi_sens_function == 'exponential':
-        noise_sens_transformed[stimuli < 0] = noise_sens_[0] + \
-            np.exp(noise_multi_sens_[0] * np.abs(stimuli[stimuli < 0])) - 1
-        noise_sens_transformed[stimuli >= 0] = noise_sens_[1] + \
-            np.exp(noise_multi_sens_[1] * np.abs(stimuli[stimuli >= 0])) - 1
-    elif noise_multi_sens_function == 'logarithm':
-        noise_sens_transformed[stimuli < 0] = noise_sens_[0] + \
-            np.log(noise_multi_sens_[0] * np.abs(stimuli[stimuli < 0]) + 1)
-        noise_sens_transformed[stimuli >= 0] = noise_sens_[1] + \
-            np.log(noise_multi_sens_[1] * np.abs(stimuli[stimuli >= 0]) + 1)
+    neg, pos = stimuli < 0, stimuli >= 0
+    if noise_transform_sens is None:
+        noise_sens_transformed[neg] *= noise_sens_[0]
+        noise_sens_transformed[pos] *= noise_sens_[1]
+    elif function_noise_transform_sens == 'multiplicative':
+        noise_sens_transformed[neg] = np.sqrt(noise_sens_[0]**2 +
+            ((np.abs(stimuli[neg]) - thresh_sens_[0]) * noise_transform_sens_[0])**2)  # noqa
+        noise_sens_transformed[pos] = np.sqrt(noise_sens_[1]**2 +
+            ((np.abs(stimuli[pos]) - thresh_sens_[1]) * noise_transform_sens_[1])**2)  # noqa
+    elif function_noise_transform_sens == 'power':
+        noise_sens_transformed[neg] = np.sqrt(noise_sens_[0]**2 +
+            (np.abs(stimuli[neg]) - thresh_sens_[0]) ** (2 * noise_transform_sens_[0]))  # noqa
+        noise_sens_transformed[pos] = np.sqrt(noise_sens_[1]**2 +
+            (np.abs(stimuli[pos]) - thresh_sens_[1]) ** (2 * noise_transform_sens_[1]))  # noqa
+    elif function_noise_transform_sens == 'exponential':
+        noise_sens_transformed[neg] = np.sqrt(noise_sens_[0]**2 +
+            (np.exp(noise_transform_sens_[0] * (np.abs(stimuli[neg]) - thresh_sens_[0])) - 1)**2)  # noqa
+        noise_sens_transformed[pos] = np.sqrt(noise_sens_[1]**2 +
+            (np.exp(noise_transform_sens_[1] * (np.abs(stimuli[pos]) - thresh_sens_[1])) - 1)**2)  # noqa
+    elif function_noise_transform_sens == 'logarithm':
+        noise_sens_transformed[neg] = np.sqrt(noise_sens_[0]**2 +
+            np.log(noise_transform_sens_[0] * (np.abs(stimuli[neg]) - thresh_sens_[0]) + 1)**2)  # noqa
+        noise_sens_transformed[pos] = np.sqrt(noise_sens_[1]**2 +
+            np.log(noise_transform_sens_[1] * (np.abs(stimuli[pos]) - thresh_sens_[1]) + 1)**2)  # noqa
     else:
-        raise ValueError(f'{noise_multi_sens_function} is not a valid transform function for noise_intercept_sens')
+        raise ValueError(f'{function_noise_transform_sens} is not a valid transform function for noise_intercept_sens')
 
     return noise_sens_transformed
 
 
-def _noise_sens_transform_pc(stimuli, dv_sens, slope_meta=None, noise_sens=None, noise_multi_sens=None,
-                             noise_multi_sens_function='linear',
-                             **kwargs):  # noqa
+def _noise_sens_transform_pc(stimuli, dv_sens, slope_meta=None, noise_sens=None, noise_transform_sens=None,
+                             function_noise_transform_sens='multiplicative', **kwargs):  # noqa
     """
-    Multiplicative sensory noise transformation.
-    Helper function for multiplicative sensory noise transformation under a probability-correct (pc) link function. In
-    this case, sensory noise might be subject to a metacognitive bias defined by slope_meta.
+    Signal-dependent sensory noise transformation.
+    Helper function for the signal-dependent sensory noise transformation under a probability-correct (pc) link
+    function. In this case, sensory noise might be subject to a metacognitive bias defined by slope_meta.
     """
     noise_sens_ = _check_param(noise_sens)
     slope_meta_ = _check_param(slope_meta)
@@ -161,20 +168,20 @@ def _noise_sens_transform_pc(stimuli, dv_sens, slope_meta=None, noise_sens=None,
 
     noise_sens_neg = [noise_sens_[0] / slope_meta_[0], noise_sens_[1] / slope_meta_[0]]
     noise_sens_transformed[(dv_sens < 0)] = \
-        noise_sens_transform(stimuli[dv_sens < 0], noise_sens_neg, noise_multi_sens=noise_multi_sens,
-                             noise_multi_sens_function=noise_multi_sens_function)
+        noise_sens_transform(stimuli[dv_sens < 0], noise_sens_neg, noise_transform_sens=noise_transform_sens,
+                             function_noise_transform_sens=function_noise_transform_sens)
     noise_sens_pos = [noise_sens_[0] / slope_meta_[1], noise_sens_[1] / slope_meta_[1]]
     noise_sens_transformed[(dv_sens >= 0)] = \
-        noise_sens_transform(stimuli[dv_sens >= 0], noise_sens_pos, noise_multi_sens=noise_multi_sens,
-                             noise_multi_sens_function=noise_multi_sens_function)
+        noise_sens_transform(stimuli[dv_sens >= 0], noise_sens_pos, noise_transform_sens=noise_transform_sens,
+                             function_noise_transform_sens=function_noise_transform_sens)
     return noise_sens_transformed
 
 
-def noise_meta_transform(confidence_or_dv_meta, dv_sens=None, noise_meta=None, noise_multi_meta=None,
-                         noise_multi_meta_function='linear',
+def noise_meta_transform(confidence_or_dv_meta, dv_sens=None, noise_meta=None, noise_transform_meta=None,
+                         function_noise_transform_meta='multiplicative',
                          ignore_warnings=False, **kwargs):  # noqa
     """
-    Multiplicative sensory noise transformation.
+    Metacognitive noise transformation.
 
     Parameters
     ----------
@@ -185,10 +192,10 @@ def noise_meta_transform(confidence_or_dv_meta, dv_sens=None, noise_meta=None, n
         Sensory decision values
     noise_meta : float or array-like
         Metacognitive noise parameter.
-    noise_multi_meta : float or array-like
-        Multiplicative metacognitive noise parameter.
-    noise_multi_meta_function : array-like
-        Multiplicative noise type. One of 'linear', 'power', 'exponential', 'logarithm'
+    noise_transform_meta : float or array-like
+        Signal-dependent metacognitive noise parameter.
+    function_noise_transform_meta : array-like
+        Signal-dependent noise type. One of 'multiplicative', 'power', 'exponential', 'logarithm'.
     ignore_warnings : bool
         If True, ignore warnings within the method (currently not used).
     kwargs : dict
@@ -202,25 +209,37 @@ def noise_meta_transform(confidence_or_dv_meta, dv_sens=None, noise_meta=None, n
     noise_meta_ = _check_param(noise_meta)
     noise_meta_transformed = np.full(confidence_or_dv_meta.shape, np.nan)
     neg, pos = dv_sens < 0, dv_sens >= 0
-    if noise_multi_meta is None:
+    if noise_transform_meta is None:
         noise_meta_transformed[neg] = noise_meta_[0]
         noise_meta_transformed[pos] = noise_meta_[1]
     else:
-        noise_multi_meta_ = _check_param(noise_multi_meta)
-        if noise_multi_meta_function == 'linear':
-            noise_meta_transformed[neg] = noise_meta_[0] + confidence_or_dv_meta[neg] * noise_multi_meta_[0]
-            noise_meta_transformed[pos] = noise_meta_[1] + confidence_or_dv_meta[pos] * noise_multi_meta_[1]
-        elif noise_multi_meta_function == 'power':
-            noise_meta_transformed[neg] = noise_meta_[0] + confidence_or_dv_meta[neg] ** noise_multi_meta_[0]
-            noise_meta_transformed[pos] = noise_meta_[1] + confidence_or_dv_meta[pos] ** noise_multi_meta_[1]
-        elif noise_multi_meta_function == 'exponential':
-            noise_meta_transformed[neg] = noise_meta_[0] + np.exp(noise_multi_meta_[0] * confidence_or_dv_meta[neg]) - 1
-            noise_meta_transformed[pos] = noise_meta_[1] + np.exp(noise_multi_meta_[1] * confidence_or_dv_meta[pos]) - 1
-        elif noise_multi_meta_function == 'logarithm':
-            noise_meta_transformed[neg] = noise_meta_[0] + np.log(1 + noise_multi_meta_[0] * confidence_or_dv_meta[neg])
-            noise_meta_transformed[pos] = noise_meta_[1] + np.log(1 + noise_multi_meta_[1] * confidence_or_dv_meta[pos])
+        noise_transform_meta_ = _check_param(noise_transform_meta)
+        if function_noise_transform_meta == 'multiplicative':
+            noise_meta_transformed[neg] = np.sqrt(noise_meta_[0]**2 +
+                                                  (confidence_or_dv_meta[neg] * noise_transform_meta_[0])**2)
+            noise_meta_transformed[pos] = np.sqrt(noise_meta_[1]**2 +
+                                                  (confidence_or_dv_meta[pos] * noise_transform_meta_[1])**2)
+        elif function_noise_transform_meta == 'test':
+            noise_meta_transformed[neg] = noise_meta_[0] + noise_transform_meta_[0] * np.abs(confidence_or_dv_meta[neg])
+            noise_meta_transformed[pos] = noise_meta_[1] + noise_transform_meta_[1] * np.abs(confidence_or_dv_meta[pos])
+        elif function_noise_transform_meta == 'power':
+            noise_meta_transformed[neg] = np.sqrt(noise_meta_[0]**2 +
+                                                  confidence_or_dv_meta[neg] ** (2 * noise_transform_meta_[0]))
+            noise_meta_transformed[pos] = np.sqrt(noise_meta_[1]**2 +
+                                                  confidence_or_dv_meta[pos] ** (2 * noise_transform_meta_[1]))
+        elif function_noise_transform_meta == 'exponential':
+            noise_meta_transformed[neg] = np.sqrt(noise_meta_[0]**2 +
+                (np.exp(noise_transform_meta_[0] * confidence_or_dv_meta[neg]) - 1)**2)  # noqa
+            noise_meta_transformed[pos] = np.sqrt(noise_meta_[1]**2 +
+                (np.exp(noise_transform_meta_[1] * confidence_or_dv_meta[pos]) - 1)**2)  # noqa
+        elif function_noise_transform_meta == 'logarithm':
+            noise_meta_transformed[neg] = np.sqrt(noise_meta_[0]**2 +
+                                                  np.log(noise_transform_meta_[0] * confidence_or_dv_meta[neg] + 1)**2)
+            noise_meta_transformed[pos] = np.sqrt(noise_meta_[1]**2 +
+                                                  np.log(noise_transform_meta_[1] * confidence_or_dv_meta[pos] + 1)**2)
         else:
-            raise ValueError(f'{noise_multi_meta_function} is not a valid transform function for noise_intercept_meta')
+            raise ValueError(f'{function_noise_transform_meta} is not a valid transform function for '
+                             f'noise_intercept_meta.')
 
     # if np.any(noise_meta_transformed < 0.001):
     #     noise_meta_transformed = np.maximum(noise_meta_transformed, 0.001)
@@ -231,7 +250,7 @@ def noise_meta_transform(confidence_or_dv_meta, dv_sens=None, noise_meta=None, n
 
 
 def link_function(dv_meta, link_fun, slope_meta=1, scaling_meta=1, criteria_meta=None, levels_meta=None,
-                  noise_sens=None, noise_multi_sens=None, noise_multi_sens_function='linear',
+                  noise_sens=None, noise_transform_sens=None, function_noise_transform_sens='linear',
                   dv_sens=None, stimuli=None, constraint_mode=False, nchannels=10,
                   **kwargs):  # noqa
     """
@@ -257,10 +276,10 @@ def link_function(dv_meta, link_fun, slope_meta=1, scaling_meta=1, criteria_meta
         Confidence levels in case of a criterion-based link function.
     noise_sens : float or array-like
         Sensory noise parameter.
-    noise_multi_sens : float or array-like
-        Multiplicative sensory noise parameter.
-    noise_multi_sens_function : float or array-like
-        Multiplicative sensory noise type. One of 'linear', 'power', 'exponential', 'logarithm'
+    noise_transform_sens : float or array-like
+        Signal-dependent sensory noise parameter.
+    function_noise_transform_sens : float or array-like
+        Signal-dependent sensory noise type. One of 'linear', 'power', 'exponential', 'logarithm'.
     dv_sens : array-like
         Sensory decision values.
     stimuli : array-like
@@ -278,6 +297,13 @@ def link_function(dv_meta, link_fun, slope_meta=1, scaling_meta=1, criteria_meta
     confidence_pred : array-like
         Model-predicted confidence.
     """
+    dv_meta = np.atleast_1d(dv_meta)
+    if dv_sens is None:
+        if hasattr(slope_meta, '__len__') or hasattr(scaling_meta, '__len__'):
+            raise ValueError('Parameters slope_meta or scaling_meta appear to be sign-dependent (they have been passt '
+                             'as array-like), but dv_sens has not been provided.')
+        else:
+            dv_sens = dv_meta
     slope_meta_ = _check_param(slope_meta)
     scaling_meta_ = _check_param(scaling_meta)
     if criteria_meta is not None:
@@ -311,9 +337,15 @@ def link_function(dv_meta, link_fun, slope_meta=1, scaling_meta=1, criteria_meta
         )[link_fun]
         confidence_pred = lf(dv_meta, dv_sens, slope_meta_)
     elif link_fun == 'probability_correct':
-        noise_sens = _noise_sens_transform_pc(stimuli, dv_sens, slope_meta_, noise_sens=noise_sens,
-                                              noise_multi_sens=noise_multi_sens,
-                                              noise_sens_function=noise_multi_sens_function)
+        if stimuli is None:
+            if noise_transform_sens is not None or hasattr(noise_sens, '__len__'):
+                raise ValueError('Sensory noise is sign- or intensity-dependent, but stimuli have not been '
+                                 'provided.')
+            else:
+                stimuli = dv_sens
+        noise_sens = _noise_sens_transform_pc(stimuli, dv_sens, slope_meta=slope_meta_, noise_sens=noise_sens,
+                                              noise_transform_sens=noise_transform_sens,
+                                              noise_sens_function=function_noise_transform_sens)
         confidence_pred = np.tanh(np.pi * dv_meta / (2 * np.sqrt(3) * noise_sens))
     elif 'crit' in link_fun:
         if 'linear_tanh' in link_fun:
@@ -422,8 +454,9 @@ def link_function(dv_meta, link_fun, slope_meta=1, scaling_meta=1, criteria_meta
         # given your current observation, compute the probability of making a correct choice when faced with the
         # identical experiment again *using the mode of the posterior distribution of p_active*
         confidence_pred = 1 - (1 - dv_meta / nchannels) ** nchannels
-        # noise_multi_sens = noise_sens_transform(stimuli, noise_sens, noise_multi_sens, noise_multi_sens_function)
-        # confidence_pred = 1 - (1 - np.tanh(dv_meta / noise_multi_sens))**nchannels
+        # noise_transform_sens = noise_sens_transform(stimuli, noise_sens, noise_transform_sens,
+        #                                             function_noise_transform_sens)
+        # confidence_pred = 1 - (1 - np.tanh(dv_meta / noise_transform_sens))**nchannels
     elif link_fun.startswith('detection_model_full'):
         # given your current observation, compute the probability of making a correct choice when faced with the
         # identical experiment again *by evaluating the extended posterior distribution of p_active*
@@ -444,7 +477,7 @@ def link_function(dv_meta, link_fun, slope_meta=1, scaling_meta=1, criteria_meta
 
 
 def link_function_inv(confidence, link_fun, slope_meta=1, scaling_meta=1, criteria_meta=None, levels_meta=None,
-                      noise_sens=None, noise_multi_sens=None, noise_multi_sens_function='linear',
+                      noise_sens=None, noise_transform_sens=None, function_noise_transform_sens='linear',
                       dv_sens=None, stimuli=None,
                       **kwargs):  ## noqa
     """
@@ -470,10 +503,10 @@ def link_function_inv(confidence, link_fun, slope_meta=1, scaling_meta=1, criter
         Confidence levels in case of a criterion-based link function.
     noise_sens : float or array-like
         Sensory noise parameter.
-    noise_multi_sens : float or array-like
-        Multiplicative sensory noise parameter.
-    noise_multi_sens_function : float or array-like
-        Multiplicative sensory noise type. One of 'linear', 'power', 'exponential', 'logarithm'
+    noise_transform_sens : float or array-like
+        Signal-dependent sensory noise parameter.
+    function_noise_transform_sens : float or array-like
+        Signal-dependent sensory noise type. One of 'linear', 'power', 'exponential', 'logarithm'.
     dv_sens : array-like
         Sensory decision values.
     stimuli : array-like
@@ -487,10 +520,17 @@ def link_function_inv(confidence, link_fun, slope_meta=1, scaling_meta=1, criter
     dv_meta : array-like
         Absolute sensory decision values ('dv_meta').
     """
+    if dv_sens is None:
+        if hasattr(slope_meta, '__len__') or hasattr(scaling_meta, '__len__'):
+            raise ValueError('Parameters slope_meta or scaling_meta appear to be sign-dependent (they have been passt '
+                             'as array-like), but dv_sens has not been provided.')
+        else:
+            dv_sens = confidence
+    else:
+        confidence = np.tile(confidence, dv_sens.shape[-1])
     slope_meta_ = _check_param(slope_meta)
     scaling_meta_ = _check_param(scaling_meta)
 
-    confidence = np.tile(confidence, dv_sens.shape[-1])
     confidence[dv_sens < 0] = np.minimum(1, confidence[dv_sens < 0] / scaling_meta_[0])
     confidence[dv_sens >= 0] = np.minimum(1, confidence[dv_sens >= 0] / scaling_meta_[1])
 
@@ -513,10 +553,15 @@ def link_function_inv(confidence, link_fun, slope_meta=1, scaling_meta=1, criter
     else:
         if link_fun == 'probability_correct':
             confidence = np.minimum(1 - 1e-8, confidence)
-            noise_sens = _noise_sens_transform_pc(
-                stimuli, dv_sens, slope_meta=slope_meta_, noise_sens=noise_sens,
-                noise_multi_sens=noise_multi_sens, noise_multi_sens_function=noise_multi_sens_function,
-            )
+            if stimuli is None:
+                if noise_transform_sens is not None or hasattr(noise_sens, '__len__'):
+                    raise ValueError('Sensory noise is sign- or intensity-dependent, but stimuli have not been '
+                                     'provided.')
+            else:
+                noise_sens = _noise_sens_transform_pc(
+                    stimuli, dv_sens, slope_meta=slope_meta_, noise_sens=noise_sens,
+                    noise_transform_sens=noise_transform_sens, function_noise_transform_sens=function_noise_transform_sens,
+                )
             dv_meta = (2 * np.sqrt(3) * noise_sens / np.pi) * np.arctanh(confidence)
         elif 'criteria_linear_tanh' in link_fun:
             criteria_meta_ = _check_criteria(criteria_meta)

@@ -22,11 +22,11 @@ color_model_wrong = np.array([152, 75, 75]) / 255
 symbols = dict(
     warping_sens=r'$\omega$',
     noise_sens=r'$\sigma$',
-    noise_multi_sens=r'$\sigma_1$',
+    noise_transform_sens=r'$\sigma_1$',
     thresh_sens=r'$\vartheta$',
     bias_sens=r'$\delta$',
     noise_meta=r'$\Omega$',
-    noise_multi_meta=r'$\Omega_1$',
+    noise_transform_meta=r'$\Omega_1$',
     readout_term_meta=r'$\Theta$',
     scaling_meta=r'$\Lambda$',
     slope_meta=r'$\Psi$',
@@ -308,7 +308,7 @@ def plot_link_function(cfg, stimuli, confidence, dv_sens_mode, params_sens, para
                     dv_meta_generative = dist.rvs(nsamples_dist)
                     conf_generative = link_function(
                         dv_meta_generative, cfg.meta_link_function, stimuli=stimuli, dv_sens=dv_meta_generative,
-                        noise_multi_sens_function=cfg.function_noise_multi_sens, **params_sens, **params_meta
+                        function_noise_transform_sens=cfg.function_noise_transform_sens, **params_sens, **params_meta
                     )
                     likelihood = gaussian_kde(conf_generative, bw_method=bw).evaluate(x)
                 likelihood -= likelihood.min()
@@ -324,8 +324,8 @@ def plot_link_function(cfg, stimuli, confidence, dv_sens_mode, params_sens, para
 
         xrange = np.arange(-5, 0.001, 0.001) if k == 0 else np.arange(0, 5.001, 0.001)
         conf_model = link_function(
-            np.abs(xrange) + params_meta['readout_term_meta'], cfg.meta_link_function, stimuli=xrange,
-            dv_sens=xrange, noise_multi_sens_function=cfg.function_noise_multi_sens, **params_sens, **params_meta
+            np.abs(xrange) + params_meta['readout_term_meta'], cfg.meta_link_function, stimuli=xrange, dv_sens=xrange,
+            function_noise_transform_sens=cfg.function_noise_transform_sens, **params_sens, **params_meta
         )
         plt.plot(xrange, conf_model, color=color_linkfunction, lw=3.5, zorder=5, alpha=0.9,
                  label='Link function' if k == 0 else None)
@@ -417,7 +417,7 @@ def plot_confidence_dist(cfg, stimuli, confidence, params_sens, params_meta, nsa
                             dv_meta_generative[dv_meta_generative < 0] = 0
                         dvm_to_conf = link_function(
                             dv_meta_generative, cfg.meta_link_function, stimuli=dv_meta_generative,
-                            noise_multi_sens_function=cfg.function_noise_multi_sens,
+                            function_noise_transform_sens=cfg.function_noise_transform_sens,
                             **params_sens, **params_meta
                         )
                         likelihood = gaussian_kde(dvm_to_conf, bw_method=bw).evaluate(x)
