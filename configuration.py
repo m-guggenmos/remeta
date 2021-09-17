@@ -24,7 +24,7 @@ class Configuration(ReprMixin):
         Possible values: 'noisy_report', 'noisy_readout'
     meta_noise_model : str
         Metacognitive noise distribution.
-        Possible valus: 'norm', 'gumbel', 'lognorm', 'lognorm_varstd', 'beta_spread', 'beta', 'betaprime', 'gamma',
+        Possible valus: 'norm', 'gumbel', 'lognorm', 'lognorm_varstd', 'beta', 'beta_std', 'betaprime', 'gamma',
                         'censored_norm', 'censored_gumbel', 'censored_lognorm', 'censored_lognorm_varstd',
                         'censored_betaprime', 'censored_gamma',
                         'truncated_norm', 'truncated_norm_lookup', 'truncated_norm_fit',
@@ -134,29 +134,29 @@ class Configuration(ReprMixin):
 
     *** Methodoligcal aspects of parameter fitting ***
     * Note: this applies to the fitting of metacognitive parameters only.
-    gridsearch : bool
-        If True, perform initial (usually coarse) grid search, based on the grid defined for a Parameter.
-    fine_gridsearch : bool
-        If True, perform an iteratively finer grid search for each parameter.
-    grid_multiproc : bool
+    gridsearch : bool (default: True)
+        If True, perform initial (usually coarse) gridsearch search, based on the gridsearch defined for a Parameter.
+    fine_gridsearch : bool (default: False)
+        If True, perform an iteratively finer gridsearch search for each parameter.
+    grid_multiproc : bool (default: False)
         If True, use all available cores for the gridsearch search. If False, use a single core.
-    global_minimization : bool
+    global_minimization : bool (default: False)
         If True, use a global minimization routine.
-    gradient_free : bool
+    gradient_free : bool (default: None)
         If True, use a gradien-free optimization routine.
-    slsqp_epsilon : float
+    slsqp_epsilon : float (default: None)
         Set parameter epsilon parameter for the slsqp optimization method.
 
     *** Transformation functions ***
-    function_warping_sens: str
+    function_warping_sens: str (default: 'power')
         Can be one of 'power', 'exponential' or 'identity'.
-    function_noise_transform_sens: str
+    function_noise_transform_sens: str (default: 'multiplicative')
         Can be one of 'multiplicative', 'power', 'exponential' or 'logarithm'.
-    function_noise_transform_meta: str
+    function_noise_transform_meta: str (default: 'multiplicative')
         Can be one of 'multiplicative', 'power', 'exponential' or 'logarithm'.
 
     *** Preprocessing ***
-    normalize_stimuli_by_max : bool
+    normalize_stimuli_by_max : bool (default: True)
         If True, normalize provided stimuli by their maximum value.
     confidence_bounds_error : float
         Set ratings < confidence_bounds_error to 0 and > confidence_bounds_erroror to 1. This might be useful, if
@@ -178,9 +178,9 @@ class Configuration(ReprMixin):
     force_settings : bool
         Some setting combinations are known to be incompatible and/or to produce biased fits. If True, fit the model
         nevertheless.
-    settings_ignore_warnings : bool
+    settings_ignore_warnings : bool (default: False)
         If True, ignore warnings about user-specified settings.
-    print_configuration : bool
+    print_configuration : bool (default: True)
         If True, print the configuration at instatiation of the ReMeta class.
     """
 
@@ -221,9 +221,9 @@ class Configuration(ReprMixin):
     constraints_sens_callable: Callable = None
     constraints_meta_callable: Callable = None
 
-    function_warping_sens: str = 'exponential'
-    function_noise_transform_sens: str = 'linear'
-    function_noise_transform_meta: str = 'linear'
+    function_warping_sens: str = 'power'
+    function_noise_transform_sens: str = 'multiplicative'
+    function_noise_transform_meta: str = 'multiplicative'
 
     gridsearch: bool = True
     fine_gridsearch: bool = False
@@ -232,7 +232,7 @@ class Configuration(ReprMixin):
     gradient_free: bool = None
     slsqp_epsilon: float = None
 
-    normalize_stimuli_by_max: bool = False
+    normalize_stimuli_by_max: bool = True
     confidence_bounds_error: float = 0
 
     binsize_meta: float = 1e-3
@@ -244,15 +244,16 @@ class Configuration(ReprMixin):
     settings_ignore_warnings: bool = False
     print_configuration: bool = False
 
-    noise_sens_min: float = 0.001
+    noise_sens_default: float = 0.001
+    noise_meta_default: float = 0.1
     noise_meta_min: float = 0.001
 
     _warping_sens_default: Parameter = Parameter(guess=0.1, bounds=(-10, 10), grid_range=np.arange(-10, 11, 5))
     _noise_transform_sens_default: Parameter = Parameter(guess=0, bounds=(0, 10), grid_range=np.arange(0, 1.1, 0.25))
-    _noise_sens_default: Parameter = Parameter(guess=0.1, bounds=(1e-3, 10), grid_range=np.arange(0.1, 0.9, 0.25))
+    _noise_sens_default: Parameter = Parameter(guess=0.1, bounds=(1e-3, 100), grid_range=np.arange(0.1, 0.9, 0.25))
     _thresh_sens_default: Parameter = Parameter(guess=0, bounds=(0, 1), grid_range=np.arange(0, 0.41, 0.2))
     _bias_sens_default: Parameter = Parameter(guess=0, bounds=(-1, 1), grid_range=np.arange(-0.1, 0.11, 0.1))
-    _noise_meta_default: Parameter = Parameter(guess=0.2, bounds=(0, 5), grid_range=np.arange(0.05, 1, 0.1))
+    _noise_meta_default: Parameter = Parameter(guess=0.2, bounds=(1e-5, 5), grid_range=np.arange(0.05, 1, 0.1))
     _noise_transform_meta_default: Parameter = Parameter(guess=0, bounds=(0, 10),
                                                          grid_range=np.arange(0, 1.1, 0.25))
     _readout_term_meta_default: Parameter = Parameter(guess=0, bounds=(-1, 1), grid_range=np.arange(-0.2, 0.21, 0.1))
@@ -362,11 +363,11 @@ class Configuration(ReprMixin):
         if self.paramset_meta is None:
 
             if self.enable_noise_meta and self.noise_meta is None:
-                if self.meta_noise_model == 'beta_spread':
-                    self._noise_meta_default.bounds = (0, 10)
-                    self._noise_meta_default.grid_range = (0.05, 0.51, 0.05)
+                if self.meta_noise_model == 'beta':
+                    self._noise_meta_default.bounds = (1e-5, 0.5)
+                    self._noise_meta_default.grid_range = np.arange(0.05, 0.5, 0.05)
                 elif self.meta_noise_type == 'noisy_readout':
-                    self._noise_meta_default.bounds = (0, 250)
+                    self._noise_meta_default.bounds = (1e-5, 250)
 
             param_names_meta = []
             params_meta = ('noise', 'noise_transform', 'readout_term', 'slope', 'scaling')

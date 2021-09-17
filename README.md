@@ -49,7 +49,7 @@ Loading dataset 'simple' which was generated with the following parameters:
     [true] slope_meta: 1.2
 No. subjects: 1, No. samples: 2000
 
-+++ Sensory component +++
++++ Sensory level +++
 Initial neg. LL: 1597.00
     [initial] noise_sens: 0.1
     [initial] bias_sens: 0
@@ -59,7 +59,7 @@ Performing local optimization
 Final neg. LL: 555.42
 Stats: 0.30 secs, 231 fevs
 
-+++ Metacognitive component +++
++++ Metacognitive level +++
 Initial neg. LL: 13239.78
     [initial] noise_meta: 0.2
     [initial] slope_meta: 1

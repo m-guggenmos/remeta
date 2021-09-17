@@ -14,27 +14,28 @@ from .util import _check_param
 color_linkfunction = np.array([141, 141, 175]) / 255
 color_logistic = color_linkfunction
 color_generative_meta = np.array([231, 168, 116]) / 255
+color_generative_meta2 = np.array([47, 158, 47]) / 255
 color_data = [0.6, 0.6, 0.6]
 
 color_model = np.array([57, 127, 95]) / 255
 color_model_wrong = np.array([152, 75, 75]) / 255
 
 symbols = dict(
-    warping_sens=r'$\omega$',
-    noise_sens=r'$\sigma$',
-    noise_transform_sens=r'$\sigma_1$',
-    thresh_sens=r'$\vartheta$',
-    bias_sens=r'$\delta$',
-    noise_meta=r'$\Omega$',
-    noise_transform_meta=r'$\Omega_1$',
-    readout_term_meta=r'$\Theta$',
-    scaling_meta=r'$\Lambda$',
-    slope_meta=r'$\Psi$',
-    criterion0_meta=r'$\Psi_1$',
-    criterion1_meta=r'$\Psi_2$',
-    criterion2_meta=r'$\Psi_3$',
-    criterion3_meta=r'$\Psi_4$',
-    criterion4_meta=r'$\Psi_5$',
+    warping_sens=r'$\gamma_\mathrm{s}$',
+    noise_sens=r'$\sigma_\mathrm{s}$',
+    noise_transform_sens=r'$\sigma_\mathrm{s,1}$',
+    thresh_sens=r'$\vartheta_\mathrm{s}$',
+    bias_sens=r'$\delta_\mathrm{s}$',
+    noise_meta=r'$\sigma_\mathrm{m}$',
+    noise_transform_meta=r'$\sigma_\mathrm{m,1}$',
+    readout_term_meta=r'$\delta_\mathrm{m}$',
+    scaling_meta=r'$\lambda_\mathrm{m}$',
+    slope_meta=r'$\varphi_\mathrm{m}$',
+    criterion0_meta=r'$\varphi_\mathrm{m,1}$',
+    criterion1_meta=r'$\varphi_\mathrm{m,2}$',
+    criterion2_meta=r'$\varphi_\mathrm{m,3}$',
+    criterion3_meta=r'$\varphi_\mathrm{m,4}$',
+    criterion4_meta=r'$\varphi_\mathrm{m,5}$',
     level0_meta=r'$C_1$',
     level1_meta=r'$C_2$',
     level2_meta=r'$C_3$',
@@ -60,9 +61,16 @@ def logistic(x, sigma, thresh, bias):
     beta = np.pi / (np.sqrt(3) * sigma)
     return \
         (np.abs(x) >= thresh) * (
-                1 / (1 + np.exp(-beta * (x - bias - np.sign(x) * thresh)))) + \
+                1 / (1 + np.exp(-beta * (x - bias)))) + \
         (np.abs(x) < thresh) * (1 / (1 + np.exp(beta * bias)))
 
+
+def logistic_old(x, sigma, thresh, bias):
+    beta = np.pi / (np.sqrt(3) * sigma)
+    return \
+        (np.abs(x) >= thresh) * (
+                1 / (1 + np.exp(-beta * (x - bias - np.sign(x) * thresh)))) + \
+        (np.abs(x) < thresh) * (1 / (1 + np.exp(beta * bias)))
 
 def posterior_detection(x, sigma, thresh, bias, nchannels):
     y = (np.abs(x) > thresh) * x - bias
@@ -86,7 +94,7 @@ def tanh(x, beta, thresh, offset):
         (np.abs(x) <= thresh) * np.sign(x) * offset
 
 
-def plot_meta_condensed(ax, s, m, nsamples_gen=1000):
+def plot_meta_condensed(ax, s, m, m2=None, nsamples_gen=1000):
     cfg = m.cfg
 
     if hasattr(m, 'model'):
@@ -117,6 +125,28 @@ def plot_meta_condensed(ax, s, m, nsamples_gen=1000):
     levels = np.unique(stimuli_norm)
     nbins = 20
 
+    if m2 is not None:
+        cfg2 = m2.cfg
+        if hasattr(m2, 'model'):
+            params_sens2 = m2.model.params_sens
+            params_meta2 = m2.model.params_meta
+            if '_criteria' in cfg2.meta_link_function:
+                params_meta2['slope_meta'] = [v for k, v in m2.model.params_meta.items() if
+                                              'criterion_meta' in k or 'confidence_level' in k]
+        else:
+            params_sens2 = m2.params_sens
+            params_meta2 = m2.params_meta
+        simu2 = simu_data(nsamples_gen, len(stimuli_norm), {**params_sens2, **params_meta2}, cfg=cfg2,
+                          stimuli_ext=stimuli_norm, verbose=False)
+
+        if 'readout_term_meta' not in params_meta2:
+            params_meta2['readout_term_meta'] = 0
+        if 'thresh_sens' not in params_sens2:
+            params_sens2['thresh_sens'] = 0
+        if 'bias_sens' not in params_sens2:
+            params_sens2['bias_sens'] = 0
+        counts_gen2 = [[] for _ in range(2)]
+
     counts, counts_gen, bins = [[] for _ in range(2)], [[] for _ in range(2)], [[] for _ in range(2)]
     for k in range(2):
         levels_ = (levels[levels < 0], levels[levels > 0])[k]
@@ -126,8 +156,13 @@ def plot_meta_condensed(ax, s, m, nsamples_gen=1000):
             bins[k] += [hist[1]]
             counts_gen[k] += [np.histogram(simu.confidence[np.tile(stimuli_norm, (nsamples_gen, 1)) == v], density=True,
                                            bins=bins[k][i])[0] / (len(bins[k][i]) - 1)]
+            if m2 is not None:
+                counts_gen2[k] += [np.histogram(simu2.confidence[np.tile(stimuli_norm, (nsamples_gen, 1)) == v],
+                                                density=True, bins=bins[k][i])[0] / (len(bins[k][i]) - 1)]
     counts = np.array(counts) / np.max(counts)
     counts_gen = np.array(counts_gen) / np.max(counts_gen)
+    if m2 is not None:
+        counts_gen2 = np.array(counts_gen2) / np.max(counts_gen2)
     bins = np.array(bins)
 
     for k in range(2):
@@ -139,6 +174,11 @@ def plot_meta_condensed(ax, s, m, nsamples_gen=1000):
             plt.plot(v + (1, -1)[k] * 0.3 * counts_gen[k, i], bins[k, i][:-1] + (bins[k, i][1] - bins[k, i][0]) / 2,
                      color=0.85 * color_generative_meta, zorder=11, lw=1.5,
                      label='Model: density' if ((k == 0) & (i == 0)) else None)
+            if m2 is not None:
+                plt.plot(v + (1, -1)[k] * 0.3 * counts_gen2[k, i],
+                         bins[k, i][:-1] + (bins[k, i][1] - bins[k, i][0]) / 2, '--', dashes=(3, 2.4),
+                         color=0.85 * color_generative_meta2,
+                         zorder=11, lw=1.5, label='Model: density' if ((k == 0) & (i == 0)) else None)
 
     plt.xlim((-1, 1))
     ylim = (-0.01, 1.01)
@@ -147,21 +187,28 @@ def plot_meta_condensed(ax, s, m, nsamples_gen=1000):
 
     if s == 17:
         plt.xlabel('Stimulus ($x$)', fontsize=11)
-        ax.xaxis.set_label_coords(1.1, -0.25)
+        ax.xaxis.set_label_coords(1.1, -0.18)
     if s == 8:
         plt.ylabel('Confidence', fontsize=11)
     if s < 16:
         plt.xticks([])
     if np.mod(s, 4) != 0:
         plt.yticks([])
-    plt.title(rf"$\Theta$=${params_meta['readout_term_meta']:.2f}$ $\Psi$=${params_meta['slope_meta']:.2f}$" 
-              "$\Omega$=${params_meta['noise_meta']:.2f}$",  # noqa
-        fontsize=9.5, y=0.97)
+    title = r"$\delta_\mathrm{m}$=" + f"${params_meta['readout_term_meta']:.2f}$ " + r"$\varphi_\mathrm{m}$=" +\
+            f"${params_meta['slope_meta']:.2f}$ " + r"$\sigma_\mathrm{m}$=" + f"${params_meta['noise_meta']:.2f}$"
+    if m2 is not None:
+        title2 = r"$\delta_\mathrm{m}$=" + f"${params_meta2['readout_term_meta']:.2f}$ " + r"$\varphi_\mathrm{m}$=" +\
+                 f"${params_meta2['slope_meta']:.2f}$ " + r"$\sigma_\mathrm{m}$=" +\
+                 f"${params_meta2['noise_meta']:.2f}$"
+        plt.text(0, 1.23, title, fontsize=8.5, color=np.array([165, 110, 0])/255, ha='center')
+        plt.text(0, 1.13, title2, fontsize=8.5, color=np.array([30, 98, 38])/255, ha='center')
+    else:
+        plt.title(title, fontsize=9, y=0.97)
     plt.text(0, 0.8, f'{s + 1}', bbox=dict(fc=[0.8, 0.8, 0.8], ec=[0.5, 0.5, 0.5], lw=0.5, pad=2, alpha=0.8),
              fontsize=10, ha='center')
 
 
-def plot_psychometric(cfg, choices, stimuli, params_sens):
+def plot_psychometric(cfg, choices, stimuli, params_sens, figure_paper=False):
 
     noise_sens = _check_param(params_sens['noise_sens'])
     thresh_sens = params_sens['thresh_sens'] if cfg.enable_thresh_sens else 0
@@ -212,12 +259,13 @@ def plot_psychometric(cfg, choices, stimuli, params_sens):
         lh._legmarker.set_alpha(1)  # noqa
     anot_sens = []
     for i, (k, v) in enumerate(params_sens.items()):
-        if hasattr(v, '__len__'):
-            val = ', '.join([f"{p:{'.0f' if p == 0 else '.3f'}}" for p in v])
-            anot_sens += [f"${symbols[k][1:-1]}=" + f"[{val}]$"]
-        else:
-            anot_sens += [f"${symbols[k][1:-1]}={v:{'.0f' if v == 0 else '.3f'}}$"]
-    plt.text(1.045, -0.1, r'Parameters:' + '\n' + '\n'.join(anot_sens), transform=plt.gca().transAxes,
+        if getattr(cfg, f'enable_{k}'):
+            if hasattr(v, '__len__'):
+                val = ', '.join([f"{p:{'.0f' if p == 0 else ('.3f','.2f')[figure_paper]}}" for p in v])
+                anot_sens += [f"${symbols[k][1:-1]}=" + f"[{val}]$"]
+            else:
+                anot_sens += [f"${symbols[k][1:-1]}={v:{'.0f' if v == 0 else ('.3f','.2f')[figure_paper]}}$"]
+    plt.text(1.045, -0.1, r'Estimated parameters:' + '\n' + '\n'.join(anot_sens), transform=plt.gca().transAxes,
              bbox=dict(fc=[1, 1, 1], ec=[0.5, 0.5, 0.5], lw=1, pad=5), fontsize=9)
     set_fontsize(label=13, tick=11)
 
@@ -242,7 +290,7 @@ def plot_confidence(stimuli, confidence):
 
 def plot_link_function(cfg, stimuli, confidence, dv_sens_mode, params_sens, params_meta,
                        plot_likelihood=False, var_likelihood=None, noise_meta_transformed=None, dv_range=(45, 50, 55),
-                       nsamples_gen=1000, nsamples_dist=100000, bw=0.03):
+                       nsamples_gen=1000, nsamples_dist=100000, bw=0.03, figure_paper=False):
 
     ax = plt.gca()
 
@@ -281,7 +329,7 @@ def plot_link_function(cfg, stimuli, confidence, dv_sens_mode, params_sens, para
 
         _, cap, barlinecols = plt.errorbar(
             vals_dv_gen_+0.015, conf_gen_means, yerr=[conf_gen_std_neg, conf_gen_std_pos],
-            label='Generative model' if k == 0 else None, marker='o', markersize=7, mew=1, mec=color_generative_meta,
+            label='Generative model' if k == 0 else None, marker='o', markersize=7, mew=1, mec='k',
             color='None', ecolor=color_generative_meta, mfc=color_generative_meta, clip_on=False, zorder=35,
             elinewidth=1.5, capsize=5
         )
@@ -338,15 +386,16 @@ def plot_link_function(cfg, stimuli, confidence, dv_sens_mode, params_sens, para
     plt.ylabel('Confidence')
     handles, labels = plt.gca().get_legend_handles_labels()
     if plot_likelihood:
-        order = [2, 1, 0]
+        order = [2, 1, 0, 3]
         plt.legend([handles[i] for i in order], [labels[i] for i in order], bbox_to_anchor=(1.02, 1), loc="upper left",
                    fontsize=9)
     else:
         plt.legend(bbox_to_anchor=(1.01, 1), loc="upper left", fontsize=9)
     ax.yaxis.grid('on', color=[0.9, 0.9, 0.9])
 
-    anot_meta = [f"${symbols[p][1:-1]}={params_meta[p]:{'.0f' if params_meta[p] == 0 else '.3f'}}$" for p in params_meta
-                 if not ((p == 'slope_meta') and '_criteria' in cfg.meta_link_function)]
+    anot_meta = \
+        [f"${symbols[p][1:-1]}={params_meta[p]:{'.0f' if params_meta[p] == 0 else ('.3f', '.2f')[figure_paper]}}$" for
+         p in params_meta if not ((p == 'slope_meta') and '_criteria' in cfg.meta_link_function)]
     plt.text(1.045, -0.2, r'Estimated parameters:' + '\n' + '\n'.join(anot_meta), transform=plt.gca().transAxes,
              bbox=dict(fc=[1, 1, 1], ec=[0.5, 0.5, 0.5], lw=1, pad=5), fontsize=9)
 
@@ -521,7 +570,7 @@ def plot_sensory_meta(m, plot_subject_id=False, nsamples_gen=1000, figure_paper=
         fig.suptitle(f'Subject {m.subject_id}', fontsize=16)
 
     plt.subplot(3, 1, 1)
-    ax1 = plot_psychometric(cfg, choices, stimuli_norm, params_sens)
+    ax1 = plot_psychometric(cfg, choices, stimuli_norm, params_sens, figure_paper=figure_paper)
     ax1.yaxis.set_label_coords(-0.1, 0.43)
     plt.text(-0.15, 1.01, 'A', transform=ax1.transAxes, color=(0, 0, 0), fontsize=19)
 
@@ -529,7 +578,8 @@ def plot_sensory_meta(m, plot_subject_id=False, nsamples_gen=1000, figure_paper=
     ax2 = plot_link_function(cfg, stimuli_norm, confidence, dv_sens_mode, params_sens, params_meta,
                              plot_likelihood=not simulation, var_likelihood=var_likelihood,
                              noise_meta_transformed=noise_meta_transformed,
-                             dv_range=(0,) if simulation else (45, 50, 55))
+                             dv_range=(0,) if simulation else (45, 50, 55),
+                             figure_paper=figure_paper)
     plt.text(-0.15, 1.01, 'B', transform=ax2.transAxes, color=(0, 0, 0), fontsize=19)
 
     plt.subplot(3, 1, 3)

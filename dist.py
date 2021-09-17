@@ -5,7 +5,7 @@ from .fast_truncnorm import truncnorm
 
 
 META_NOISE_MODELS = (
-    'norm', 'gumbel', 'lognorm', 'lognorm_varstd', 'beta_spread', 'beta', 'betaprime', 'gamma',
+    'norm', 'gumbel', 'lognorm', 'lognorm_varstd', 'beta', 'beta_std        ', 'betaprime', 'gamma',
     'censored_norm', 'censored_gumbel', 'censored_lognorm', 'censored_lognorm_varstd',
     'censored_betaprime', 'censored_gamma',
     'truncated_norm', 'truncated_norm_lookup', 'truncated_norm_fit',
@@ -86,8 +86,8 @@ class truncated_lognorm:  # noqa
         cdens = (x > self.b) + (x <= self.b) * self.dist.cdf(x) / self.lncdf_b
         return cdens
 
-    def rvs(self, nsamples):
-        cdens = uniform(loc=0, scale=self.b).rvs(nsamples)
+    def rvs(self, size=1):
+        cdens = uniform(loc=0, scale=self.b).rvs(size)
         x = self.cdf_inv(cdens)
         return x
 
@@ -123,8 +123,7 @@ class truncated_gumbel:  # noqa
         self.cdf_a_to_b = self.dist.cdf(self.b) - self.cdf_to_a
 
     def pdf(self, x):
-        pdens = ((x > self.a) & (x < self.b)) * self.dist.pdf(x.astype(np.float128)).astype(np.float64) / \
-                self.cdf_a_to_b
+        pdens = ((x > self.a) & (x < self.b)) * self.dist.pdf(np.float128(x)).astype(np.float64) / self.cdf_a_to_b
         return pdens
 
     def cdf(self, x):
@@ -134,8 +133,8 @@ class truncated_gumbel:  # noqa
         cdens = (x >= self.b) + ((x > self.a) & (x < self.b)) * (cdf_to_x - self.cdf_to_a) / self.cdf_a_to_b
         return cdens
 
-    def rvs(self, nsamples):
-        cdens = uniform(loc=self.cdf_to_a, scale=self.cdf_a_to_b).rvs(nsamples)
+    def rvs(self, size=1):
+        cdens = uniform(loc=self.cdf_to_a, scale=self.cdf_a_to_b).rvs(size)
         x = self.cdf_inv(cdens)
         return x
 
@@ -237,7 +236,7 @@ def get_dist_mean(distname, mode, scale):
     return mean
 
 
-def get_pdf(x, distname, mode, scale, lb=0, ub=1):
+def get_pdf(x, distname, mode, scale, lb=0, ub=1, meta_noise_type='noisy_report'):
     """
     Helper function to get the probability density of a distribution.
     """
@@ -252,7 +251,7 @@ def get_pdf(x, distname, mode, scale, lb=0, ub=1):
               (x <= lb) * cdf_margin_low + \
               (x >= ub) * cdf_margin_high
     else:
-        pdf = get_dist(distname, mode, scale).pdf(x)
+        pdf = get_dist(distname, mode, scale, meta_noise_type).pdf(x)
     return pdf
 
 

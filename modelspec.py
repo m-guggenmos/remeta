@@ -88,6 +88,7 @@ class Data(ReprMixin):
         self.stimuli = None
         self.stimulus_ids = None
         self.stimuli_unnorm_max = None
+        self.stimuli_min = None
         self.correct = None
         self.stimuli_2d = None
         self.choices_2d = None
@@ -103,15 +104,16 @@ class Data(ReprMixin):
         if np.array_equal(np.unique(self.choices[~np.isnan(self.choices)]), [-1, 1]):
             self.choices[self.choices == -1] = 0
 
-        if np.max(np.abs(self.stimuli_unnorm)) > 1:
-            raise ValueError('Stimuli are not normalized to the range [-1; 1].')
-
+        self.stimuli_unnorm_max = np.max(np.abs(self.stimuli_unnorm))
         # Normalize stimuli
         if self.cfg.normalize_stimuli_by_max:
             self.stimuli = self.stimuli_unnorm / self.stimuli_unnorm_max
         else:
+            if np.max(np.abs(self.stimuli_unnorm)) > 1:
+                raise ValueError('Stimuli are not normalized to the range [-1; 1].')
             self.stimuli = self.stimuli_unnorm
-        self.stimuli_unnorm_max = np.max(np.abs(self.stimuli_unnorm))
+
+        self.stimuli_min = np.abs(self.stimuli).min()
 
         if self.cfg.confidence_bounds_error > 0:
             self.confidence[self.confidence <= self.cfg.confidence_bounds_error] = 0
@@ -201,7 +203,7 @@ class Model(ReprMixin):
         self.posterior = posterior
         self.fit.fit_sens.negll = negll
         if not self.cfg.enable_noise_sens:
-            self.params_sens['noise_sens'] = self.cfg.noise_sens_min
+            self.params_sens['noise_sens'] = self.cfg.noise_sens_default
         self.params_sens_unnorm = {k: list(np.array(v) * stimulus_norm_coefficent) if hasattr(v, '__len__') else
                                    v * stimulus_norm_coefficent for k, v in params_sens.items()}
 

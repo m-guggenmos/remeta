@@ -148,7 +148,7 @@ def noise_sens_transform(stimuli, noise_sens=None, noise_transform_sens=None, th
         noise_sens_transformed[pos] = np.sqrt(noise_sens_[1]**2 +
             np.log(noise_transform_sens_[1] * (np.abs(stimuli[pos]) - thresh_sens_[1]) + 1)**2)  # noqa
     else:
-        raise ValueError(f'{function_noise_transform_sens} is not a valid transform function for noise_intercept_sens')
+        raise ValueError(f'{function_noise_transform_sens} is not a valid transform function for noise_sens')
 
     return noise_sens_transformed
 

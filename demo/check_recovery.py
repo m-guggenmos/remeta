@@ -17,15 +17,15 @@ np.random.seed(seed)
 
 # Ns
 ####
-nsamples = 25000  # number of trials for each subject
-nsubjects = 5
+nsamples = 15000  # number of trials for each subject
+nsubjects = 10
 
 
 
 # True parameters
 #################
 true_params = dict(
-    noise_sens=0.2,
+    noise_sens=0.5,
     # noise_sens=[0.2, 0.2],
     # noise_transform_sens=0.2,
     noise_transform_sens=[0.15, 0.35],
@@ -37,7 +37,8 @@ true_params = dict(
     # warping_sens=0.2,
     warping_sens=[-0.15, -0.35],
     # warping_sens=[0.2, 0.2],
-    noise_meta=0.1,
+    # noise_meta=0.1,
+    noise_meta=0.2,
     # noise_meta=[0.15, 0.35],
     noise_transform_meta=0.1,
     # noise_transform_meta=[0.15, 0.35],
@@ -59,8 +60,8 @@ true_params = dict(
     # slope_meta=[0.273, 0.476, 0.715],
     # slope_meta=[0.273, 0.476],
     # slope_meta=[0.2, 0.35, 0.7],
-    # readout_term_meta=0.2,
-    readout_term_meta=[0.15, 0.35]
+    readout_term_meta=-0.1,
+    # readout_term_meta=[0.15, 0.35]
 )
 
 options = dict(
@@ -70,12 +71,12 @@ options = dict(
     enable_thresh_sens=0,
     enable_bias_sens=0,
     enable_noise_meta=1,
-    enable_noise_transform_meta=0,
+    enable_noise_transform_meta=1,
     enable_readout_term_meta=0,
     enable_slope_meta=0,
     enable_criteria_meta=0,
     enable_levels_meta=0,
-    enable_scaling_meta=1,
+    enable_scaling_meta=0,
 
     function_warping_sens='power',
     function_noise_transform_sens='multiplicative',
@@ -93,21 +94,23 @@ options = dict(
     # meta_link_function='linear',
     meta_link_function='probability_correct',
     # meta_link_function='probability_correct_ideal',
-    meta_noise_type='noisy_readout',
-    # meta_noise_type='noisy_report',
+    # meta_noise_type='noisy_readout',
+    meta_noise_type='noisy_report',
     # meta_noise_model='truncnorm_2sd_assym',
     meta_noise_model='truncated_norm',
     # meta_noise_model='beta',
     # meta_noise_model='lognorm',
     # meta_noise_model='censored_norm',
 
-    gridsearch=False,
+    gridsearch=True,
     fine_gridsearch=False,
     grid_multiproc=False,
     global_minimization=False,
     skip_meta=False,
     print_configuration=False,
-    force_settings=True
+    force_settings=True,
+    gradient_free=True,
+    # noise_meta_default=0.1
 )
 
 print(f"meta_noise_type: {options['meta_noise_type']}")

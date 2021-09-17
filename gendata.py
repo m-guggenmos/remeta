@@ -49,16 +49,20 @@ def simu_type1_responses(stimuli, params, cfg):
         noise_sens = noise_sens_transform(
             stimuli=stimuli, function_noise_transform_sens=cfg.function_noise_transform_sens, **params)
     else:
-        noise_sens = cfg.noise_sens_min
+        noise_sens = cfg.noise_sens_default
 
     thresh_sens = _check_param(params['thresh_sens'] if cfg.enable_thresh_sens else 0)
     bias_sens = _check_param(params['bias_sens'] if cfg.enable_bias_sens else 0)
 
     dv_sens_before_noise = np.full(stimuli_final.shape, np.nan)
+    # dv_sens_before_noise[stimuli_final < 0] = (np.abs(stimuli_final[stimuli_final < 0]) > thresh_sens[0]) * \
+    #     (stimuli_final[stimuli_final < 0] - np.sign(stimuli_final[stimuli_final < 0]) * thresh_sens[0]) - bias_sens[0]
+    # dv_sens_before_noise[stimuli_final >= 0] = (np.abs(stimuli_final[stimuli_final >= 0]) > thresh_sens[1]) * \
+    #     (stimuli_final[stimuli_final >= 0] - np.sign(stimuli_final[stimuli_final >= 0]) * thresh_sens[1]) - bias_sens[1]
     dv_sens_before_noise[stimuli_final < 0] = (np.abs(stimuli_final[stimuli_final < 0]) > thresh_sens[0]) * \
-        (stimuli_final[stimuli_final < 0] - np.sign(stimuli_final[stimuli_final < 0]) * thresh_sens[0]) - bias_sens[0]
+        stimuli_final[stimuli_final < 0] - bias_sens[0]
     dv_sens_before_noise[stimuli_final >= 0] = (np.abs(stimuli_final[stimuli_final >= 0]) > thresh_sens[1]) * \
-        (stimuli_final[stimuli_final >= 0] - np.sign(stimuli_final[stimuli_final >= 0]) * thresh_sens[1]) - bias_sens[1]
+        stimuli_final[stimuli_final >= 0] - bias_sens[1]
 
     if cfg.detection_model:
         nchannels = cfg.detection_model_nchannels  # number of sensory channels
@@ -110,9 +114,9 @@ def simu_data(nsubjects, nsamples, params, cfg=None, stimuli_ext=None, verbose=T
         if not getattr(cfg, f'enable_{p}_meta'):
             params.pop(f'{p}_meta', None)
     if not cfg.enable_noise_sens:
-        params['noise_sens'] = cfg.noise_sens_min
+        params['noise_sens'] = cfg.noise_sens_default
     if not cfg.enable_noise_meta:
-        params['noise_meta'] = cfg.noise_meta_min
+        params['noise_meta'] = cfg.noise_meta_default
 
     if cfg.enable_criteria_meta:
         ncrit_meta = int(cfg.meta_link_function.split('_')[0])
@@ -140,7 +144,9 @@ def simu_data(nsubjects, nsamples, params, cfg=None, stimuli_ext=None, verbose=T
     if stimuli_ext is None:
         stimuli = generate_stimuli(nsubjects, nsamples, stepsize=stimuli_stepsize)
     else:
-        stimuli = np.tile(stimuli_ext / np.max(np.abs(stimuli_ext)), (nsubjects, 1))
+        stimuli = stimuli_ext / np.max(np.abs(stimuli_ext))
+        if stimuli_ext.shape != (nsubjects, nsamples):
+            stimuli = np.tile(stimuli, (nsubjects, 1))
     stimulus_ids = (np.sign(stimuli) > 0).astype(int)
     choices, stimuli_final, dv_sens, dv_sens_mode = simu_type1_responses(stimuli, params, cfg)
 
@@ -164,7 +170,7 @@ def simu_data(nsubjects, nsamples, params, cfg=None, stimuli_ext=None, verbose=T
                     function_noise_transform_meta=cfg.function_noise_transform_meta, **params
                 )
             else:
-                noise_meta = cfg.noise_meta_min
+                noise_meta = cfg.noise_meta_default
             dist = get_dist(cfg.meta_noise_model, mode=dv_meta_before_noise, scale=noise_meta,
                             meta_noise_type=cfg.meta_noise_type, lookup_table=lookup_table)  # noqa
 
@@ -184,11 +190,11 @@ def simu_data(nsubjects, nsamples, params, cfg=None, stimuli_ext=None, verbose=T
                     confidence, dv_sens=dv_sens, function_noise_transform_meta=cfg.function_noise_transform_meta,
                     **params
                 )
-                noise_meta = np.maximum(cfg.noise_meta_min, noise_meta)
+                noise_meta = np.maximum(cfg.noise_meta_default, noise_meta)
             else:
-                noise_meta = cfg.noise_meta_min
+                noise_meta = cfg.noise_meta_default
 
-            if cfg.meta_noise_model == 'beta_spread':
+            if cfg.meta_noise_model == 'beta':
                 if np.any(noise_meta > 0.5):
                     raise ValueError(f'max(noise_meta) = {np.max(noise_meta):.2f}, but maximum allowed value for '
                                      f'noise_meta is 0.5 for metacognitive type {cfg.meta_noise_type} and noise model '
@@ -220,7 +226,7 @@ def simu_data(nsubjects, nsamples, params, cfg=None, stimuli_ext=None, verbose=T
         print(f'{TAB}Performance: {100 * np.mean(correct):.1f}% correct')
         print(f'{TAB}Confidence: {confidence.mean():.2f}')
         choice_bias = 100*choices.mean()
-        print(f"{TAB}Choice bias: {('-', '+')[choice_bias > 50]}{np.abs(choice_bias - 50):.1f}%")
+        print(f"{TAB}Choice bias: {('-', '+')[int(choice_bias > 50)]}{np.abs(choice_bias - 50):.1f}%")
         print(f'{TAB}AUROC2: {type2roc(correct, confidence):.2f}')
         print('----------------------------------')
 

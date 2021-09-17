@@ -84,7 +84,7 @@ class ReMeta:
         self.data.preproc()
 
         if verbose:
-            print('\n+++ Sensory component +++')
+            print('\n+++ Sensory level +++')
         with warnings.catch_warnings(record=True) as w:
             if ignore_warnings:
                 warnings.filterwarnings('ignore', module='scipy.optimize')
@@ -106,6 +106,14 @@ class ReMeta:
                         self._negll_sens, self.cfg.paramset_sens.guess, bounds=self.cfg.paramset_sens.bounds,
                         constraints=self.cfg.paramset_sens.constraints, method='trust-constr'
                     )
+                    if self.cfg.enable_thresh_sens:
+                        fit_powell = minimize(
+                            self._negll_sens, self.cfg.paramset_sens.guess, bounds=self.cfg.paramset_sens.bounds,
+                            constraints=self.cfg.paramset_sens.constraints, method='Powell'
+                        )
+                        if fit_powell.fun < self.model.fit.fit_sens.fun:
+                            self.model.fit.fit_sens = fit_powell
+
                 else:
                     self.model.fit.fit_sens = OptimizeResult(x=None)
                 if isinstance(self.cfg.true_params, dict):
@@ -116,8 +124,12 @@ class ReMeta:
                     self.model.fit.fit_sens.negll_true = self._negll_sens(psens_true)
 
             # call once again with final=True to save the model fit
-            fitinfo_sens = self._negll_sens(self.model.fit.fit_sens.x, final=True)
-            self.model.store_sens(*fitinfo_sens, stimulus_norm_coefficent=self.data.stimuli_unnorm_max)
+            negll, params_sens, choiceprob, posterior, stimuli_final = \
+                self._negll_sens(self.model.fit.fit_sens.x, final=True)
+            if 'thresh_sens' in params_sens and params_sens['thresh_sens'] < self.data.stimuli_min:
+                params_sens['thresh_sens'] = 0
+            self.model.store_sens(negll, params_sens, choiceprob, posterior, stimuli_final,
+                                  stimulus_norm_coefficent=self.data.stimuli_unnorm_max)
             self.model.report_fit_sens(verbose)
 
         if not ignore_warnings and verbose:
@@ -129,14 +141,15 @@ class ReMeta:
             self._compute_dv_sens()
 
             if verbose:
-                print('\n+++ Metacognitive component +++')
+                print('\n+++ Metacognitive level +++')
 
             args_meta = [ignore_warnings, None]
             if precomputed_parameters is not None:
                 if not np.all([p in precomputed_parameters for p in self.cfg.paramset_meta.names]):
                     raise ValueError('Set of precomputed metacognitive parameters is incomplete.')
                 self.model.params_meta = {p: precomputed_parameters[p] for p in self.cfg.paramset_meta.names}
-                self.model.fit.fit_meta = OptimizeResult()
+                self.model.fit.fit_meta = OptimizeResult(x=[precomputed_parameters[p] for p in
+                                                            self.cfg.paramset_meta.names])
                 fitinfo_meta = self.fun_meta(list(self.model.params_meta.values()), *args_meta, final=True)  # noqa
                 self.model.store_meta(*fitinfo_meta)
             else:
@@ -246,10 +259,12 @@ class ReMeta:
 
         cond_neg, cond_pos = stimuli_final < 0, stimuli_final >= 0
         dv_sens = np.full(stimuli_final.shape, np.nan)
-        dv_sens[cond_neg] = (np.abs(stimuli_final[cond_neg]) > thresh_sens[0]) * \
-                            (stimuli_final[cond_neg] - np.sign(stimuli_final[cond_neg]) * thresh_sens[0]) - bias_sens[0]
-        dv_sens[cond_pos] = (np.abs(stimuli_final[cond_pos]) > thresh_sens[1]) * \
-                            (stimuli_final[cond_pos] - np.sign(stimuli_final[cond_pos]) * thresh_sens[1]) - bias_sens[1]
+        # dv_sens[cond_neg] = (np.abs(stimuli_final[cond_neg]) > thresh_sens[0]) * \
+        #                     (stimuli_final[cond_neg] - np.sign(stimuli_final[cond_neg]) * thresh_sens[0]) - bias_sens[0]
+        # dv_sens[cond_pos] = (np.abs(stimuli_final[cond_pos]) > thresh_sens[1]) * \
+        #                     (stimuli_final[cond_pos] - np.sign(stimuli_final[cond_pos]) * thresh_sens[1]) - bias_sens[1]
+        dv_sens[cond_neg] = (np.abs(stimuli_final[cond_neg]) > thresh_sens[0]) * stimuli_final[cond_neg] - bias_sens[0]
+        dv_sens[cond_pos] = (np.abs(stimuli_final[cond_pos]) > thresh_sens[1]) * stimuli_final[cond_pos] - bias_sens[1]
 
         noise_sens = self._noise_sens_transform(stimuli_final, params_sens)
         if return_noise:
@@ -348,8 +363,8 @@ class ReMeta:
             with warnings.catch_warnings():
                 warnings.simplefilter('ignore', RuntimeWarning)
                 window = dist.cdf(dv_meta_from_conf_ub) - dist.cdf(dv_meta_from_conf_lb)
-            likelihood = (dv_meta_from_conf > 1e-8) * window + \
-                         (dv_meta_from_conf <= 1e-8) * dist.cdf(dv_meta_from_conf + binsize)
+                likelihood = (dv_meta_from_conf > 1e-8) * window + \
+                             (dv_meta_from_conf <= 1e-8) * dist.cdf(dv_meta_from_conf + binsize)
             if final:
                 likelihood_pdf = (dv_meta_from_conf > 1e-8) * dist.pdf(dv_meta_from_conf.astype(np.float128)).astype(
                     np.float64) + \
@@ -444,7 +459,7 @@ class ReMeta:
         noise_meta = self._noise_meta_transform(self.model.confidence, params_meta, ignore_warnings=ignore_warnings)
         if return_noise:
             return noise_meta
-        if (self.cfg.meta_noise_model == 'beta_spread') and np.any(noise_meta > 0.5):
+        if (self.cfg.meta_noise_model == 'beta') and np.any(noise_meta > 0.5):
             if np.max(noise_meta) < 0.5 + 1e-5:
                 noise_meta = np.minimum(0.5, noise_meta)
             else:
@@ -505,16 +520,20 @@ class ReMeta:
         """
         Helper function to call the sensory noise transformation function.
         """
+        if stimuli is None:
+            stimuli = self.model.stimuli_final
+        if params_sens is None:
+            params_sens = self.model.params_sens
         if self.cfg.enable_noise_sens:
-            if stimuli is None:
-                stimuli = self.model.stimuli_final
-            if params_sens is None:
-                params_sens = self.model.params_sens
             return noise_sens_transform(
                 stimuli=stimuli, function_noise_transform_sens=self.cfg.function_noise_transform_sens, **params_sens
             )
         else:
-            return self.cfg.noise_sens_min
+            params_sens = {} if params_sens is None else params_sens
+            return noise_sens_transform(
+                stimuli=stimuli, function_noise_transform_sens=self.cfg.function_noise_transform_sens,
+                **{**params_sens, 'noise_sens': self.cfg.noise_sens_default}
+            )
 
     def _noise_meta_transform(self, confidence_or_dv_meta, params_meta, ignore_warnings=False):
         """
@@ -529,7 +548,7 @@ class ReMeta:
             )
             return np.maximum(self.cfg.noise_meta_min, noise_meta_transformed)
         else:
-            return self.cfg.noise_meta_min
+            return self.cfg.noise_meta_default
 
     def _link_function(self, dv_meta, params_meta, criteria_meta=None, levels_meta=None, constraint_mode=False):
         """
@@ -565,10 +584,12 @@ class ReMeta:
 
         cond_neg, cond_pos = (self.model.stimuli_final < 0).squeeze(), (self.model.stimuli_final >= 0).squeeze()
         self.model.stimuli_final_thresh = np.full(self.model.stimuli_final.shape, np.nan)
-        self.model.stimuli_final_thresh[cond_neg] = self.model.stimuli_final[cond_neg] - \
-            np.sign(self.model.stimuli_final[cond_neg]) * thresh_sens[0]
-        self.model.stimuli_final_thresh[cond_pos] = self.model.stimuli_final[cond_pos] - \
-            np.sign(self.model.stimuli_final[cond_pos]) * thresh_sens[1]
+        # self.model.stimuli_final_thresh[cond_neg] = self.model.stimuli_final[cond_neg] - \
+        #     np.sign(self.model.stimuli_final[cond_neg]) * thresh_sens[0]
+        # self.model.stimuli_final_thresh[cond_pos] = self.model.stimuli_final[cond_pos] - \
+        #     np.sign(self.model.stimuli_final[cond_pos]) * thresh_sens[1]
+        self.model.stimuli_final_thresh[cond_neg] = self.model.stimuli_final[cond_neg]
+        self.model.stimuli_final_thresh[cond_pos] = self.model.stimuli_final[cond_pos]
         dv_sens_mode = np.full(self.model.stimuli_final.shape, np.nan)
         dv_sens_mode[cond_neg] = (np.abs(self.model.stimuli_final[cond_neg]) >= thresh_sens[0]) * \
             self.model.stimuli_final_thresh[cond_neg] - bias_sens[0]
@@ -580,9 +601,9 @@ class ReMeta:
 
         if self.cfg.detection_model:
             nchannels = self.cfg.detection_model_nchannels  # number of sensory channels
-            p_active = np.full(dv_sens_mode.shape, np.nan)
-            p_active[cond_neg] = np.tanh(np.abs(dv_sens_mode[cond_neg]) / noise_sens[0])  # prob. that channel is active
-            p_active[cond_pos] = np.tanh(np.abs(dv_sens_mode[cond_pos]) / noise_sens[1])  # prob. that channel is active
+            p_active = np.full(dv_sens_mode.shape, np.nan)  # prob. channel active
+            p_active[cond_neg] = np.tanh(np.abs(dv_sens_mode[cond_neg]) / noise_sens[cond_neg])
+            p_active[cond_pos] = np.tanh(np.abs(dv_sens_mode[cond_pos]) / noise_sens[cond_pos])
 
             signs = np.sign(dv_sens_mode)
             dv_sens_mode = signs * p_active * nchannels
@@ -616,13 +637,13 @@ class ReMeta:
             range_ = np.linspace(0, self.cfg.max_dv_deviation, int((self.cfg.nbins_dv + 1) / 2))[1:]
             dv_sens_range = np.hstack((-range_[::-1], 0, range_))
             self.model.dv_sens_considered = np.full((dv_sens_mode.shape[0], dv_sens_range.shape[0]), np.nan)
-            self.model.dv_sens_considered[cond_neg] = dv_sens_mode[cond_neg] + dv_sens_range * noise_sens[0]
-            self.model.dv_sens_considered[cond_pos] = dv_sens_mode[cond_pos] + dv_sens_range * noise_sens[1]
+            self.model.dv_sens_considered[cond_neg] = dv_sens_mode[cond_neg] + dv_sens_range * noise_sens[cond_neg]
+            self.model.dv_sens_considered[cond_pos] = dv_sens_mode[cond_pos] + dv_sens_range * noise_sens[cond_pos]
 
-            logistic_neg = logistic_dist(loc=dv_sens_mode[cond_neg], scale=noise_sens[0] * np.sqrt(3) / np.pi)
-            logistic_pos = logistic_dist(loc=dv_sens_mode[cond_pos], scale=noise_sens[1] * np.sqrt(3) / np.pi)
-            margin_neg = noise_sens[0] * self.cfg.max_dv_deviation / self.cfg.nbins_dv
-            margin_pos = noise_sens[1] * self.cfg.max_dv_deviation / self.cfg.nbins_dv
+            logistic_neg = logistic_dist(loc=dv_sens_mode[cond_neg], scale=noise_sens[cond_neg] * np.sqrt(3) / np.pi)
+            logistic_pos = logistic_dist(loc=dv_sens_mode[cond_pos], scale=noise_sens[cond_pos] * np.sqrt(3) / np.pi)
+            margin_neg = noise_sens[cond_neg] * self.cfg.max_dv_deviation / self.cfg.nbins_dv
+            margin_pos = noise_sens[cond_pos] * self.cfg.max_dv_deviation / self.cfg.nbins_dv
             self.model.dv_sens_pmf = np.full(self.model.dv_sens_considered.shape, np.nan)
             self.model.dv_sens_pmf[cond_neg] = (logistic_neg.cdf(self.model.dv_sens_considered[cond_neg] + margin_neg) -
                                                 logistic_neg.cdf(self.model.dv_sens_considered[cond_neg] - margin_neg))
