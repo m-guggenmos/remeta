@@ -190,7 +190,7 @@ def simu_data(nsubjects, nsamples, params, cfg=None, stimuli_ext=None, verbose=T
                     confidence, dv_sens=dv_sens, function_noise_transform_meta=cfg.function_noise_transform_meta,
                     **params
                 )
-                noise_meta = np.maximum(cfg.noise_meta_default, noise_meta)
+                noise_meta = np.maximum(cfg.noise_meta_min, noise_meta)
             else:
                 noise_meta = cfg.noise_meta_default
 

@@ -1,17 +1,20 @@
 import numpy as np
 import warnings
-from scipy.stats import norm, lognorm, beta, betaprime, gamma, uniform, gumbel_r
+from scipy.stats import lognorm, beta, betaprime, gamma, uniform, gumbel_r
 from .fast_truncnorm import truncnorm
 
 
 META_NOISE_MODELS = (
-    'norm', 'gumbel', 'lognorm', 'lognorm_varstd', 'beta', 'beta_std        ', 'betaprime', 'gamma',
+    'beta', 'beta_std',
+    'lognorm', 'lognorm_varstd', 'betaprime', 'gamma',
     'censored_norm', 'censored_gumbel', 'censored_lognorm', 'censored_lognorm_varstd',
     'censored_betaprime', 'censored_gamma',
     'truncated_norm', 'truncated_norm_lookup', 'truncated_norm_fit',
     'truncated_gumbel', 'truncated_gumbel_lookup',
     'truncated_lognorm', 'truncated_lognorm_varstd'
 )
+META_NOISE_MODELS_REPORT = ('beta', 'beta_std')
+META_NOISE_MODELS_READOUT = ('lognorm', 'lognorm_varstd', 'betaprime', 'gamma')
 
 
 def _lognorm_params(mode, stddev):
@@ -35,7 +38,7 @@ def _lognorm_params(mode, stddev):
     """
     mode = np.maximum(1e-5, mode)
     a = stddev ** 2 / mode ** 2
-    x = 1 / 4 * np.sqrt(np.maximum(1e-10, -(16 * (2 / 3) ** (1 / 3) * a) / (
+    x = 1 / 4 * np.sqrt(np.maximum(1e-300, -(16 * (2 / 3) ** (1 / 3) * a) / (
                 np.sqrt(3) * np.sqrt(256 * a ** 3 + 27 * a ** 2) - 9 * a) ** (1 / 3) +
                                    2 * (2 / 3) ** (2 / 3) * (
                                                np.sqrt(3) * np.sqrt(256 * a ** 3 + 27 * a ** 2) - 9 * a) ** (
@@ -43,14 +46,14 @@ def _lognorm_params(mode, stddev):
         1 / 2 * np.sqrt(
         (4 * (2 / 3) ** (1 / 3) * a) / (np.sqrt(3) * np.sqrt(256 * a ** 3 + 27 * a ** 2) - 9 * a) ** (1 / 3) -
         (np.sqrt(3) * np.sqrt(256 * a ** 3 + 27 * a ** 2) - 9 * a) ** (1 / 3) / (2 ** (1 / 3) * 3 ** (2 / 3)) +
-        1 / (2 * np.sqrt(np.maximum(1e-10, -(16 * (2 / 3) ** (1 / 3) * a) / (
+        1 / (2 * np.sqrt(np.maximum(1e-300, -(16 * (2 / 3) ** (1 / 3) * a) / (
                     np.sqrt(3) * np.sqrt(256 * a ** 3 + 27 * a ** 2) - 9 * a) ** (1 / 3) +
                                     2 * (2 / 3) ** (2 / 3) * (
                                                 np.sqrt(3) * np.sqrt(256 * a ** 3 + 27 * a ** 2) - 9 * a) ** (
                                                 1 / 3) + 1))) + 1 / 2) + \
         1 / 4
     shape = np.sqrt(np.log(x))
-    scale = mode * x  # scale = np.exp(mu) -> mu = np.log(mode * x)
+    scale = mode * x
     return shape, scale
 
 
@@ -86,7 +89,12 @@ class truncated_lognorm:  # noqa
         cdens = (x > self.b) + (x <= self.b) * self.dist.cdf(x) / self.lncdf_b
         return cdens
 
-    def rvs(self, size=1):
+    def rvs(self, size=None):
+        if size is None:
+            if hasattr(self.scale, '__len__'):
+                size = self.scale.shape
+            else:
+                size = 1
         cdens = uniform(loc=0, scale=self.b).rvs(size)
         x = self.cdf_inv(cdens)
         return x
@@ -133,7 +141,12 @@ class truncated_gumbel:  # noqa
         cdens = (x >= self.b) + ((x > self.a) & (x < self.b)) * (cdf_to_x - self.cdf_to_a) / self.cdf_a_to_b
         return cdens
 
-    def rvs(self, size=1):
+    def rvs(self, size=None):
+        if size is None:
+            if hasattr(self.scale, '__len__'):
+                size = self.loc.shape
+            else:
+                size = 1
         cdens = uniform(loc=self.cdf_to_a, scale=self.cdf_a_to_b).rvs(size)
         x = self.cdf_inv(cdens)
         return x
@@ -149,18 +162,18 @@ def get_dist(meta_noise_model, mode, scale, meta_noise_type='noisy_report', look
     """
 
     if meta_noise_model not in META_NOISE_MODELS:
-        raise ValueError(f"Invalid distribution '{meta_noise_model}'.")
+        raise ValueError(f"Unkonwn distribution '{meta_noise_model}'.")
+    elif (meta_noise_type == 'noisy_report') and meta_noise_model in META_NOISE_MODELS_READOUT:
+        raise ValueError(f"Distribution '{meta_noise_model}' is only valid for noisy-readout models.")
+    elif (meta_noise_type == 'noisy_readout') and meta_noise_model in META_NOISE_MODELS_REPORT:
+        raise ValueError(f"Distribution '{meta_noise_model}' is only valid for noisy-report models.")
 
     if meta_noise_model.startswith('censored_'):
         distname = meta_noise_model[meta_noise_model.find('_')+1:]
     else:
         distname = meta_noise_model
 
-    if distname == 'norm':
-        dist = norm(loc=mode, scale=scale)
-    elif distname == 'gumbel':
-        dist = gumbel_r(loc=mode, scale=scale * np.sqrt(6) / np.pi)
-    elif distname == 'lognorm':
+    if distname == 'lognorm':
         shape, scale = _lognorm_params(np.maximum(1e-5, mode), scale)
         dist = lognorm(loc=0, scale=scale, s=shape)
     elif distname == 'lognorm_varstd':
