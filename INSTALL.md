@@ -1,6 +1,8 @@
 # ReMeta Toolbox: installation
 
-ReMeta can be installed with `pip`:
+Remeta requires a working Python installation. It should run with Python >=3.6.
+
+The ReMeta itself can be installed with `pip`:
 ```
 pip install git+https://github.com/m-guggenmos/remeta.git
 ```
