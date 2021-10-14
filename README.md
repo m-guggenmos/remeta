@@ -1,6 +1,6 @@
 Go directly to:
 - [**Basic Usage**](https://github.com/m-guggenmos/remeta/blob/master/demo/basic_usage.ipynb)
-- [**Installation**](https://github.com/m-guggenmos/remeta/blob/master/demo/INSTALL.md)
+- [**Installation**](https://github.com/m-guggenmos/remeta/blob/master/INSTALL.md)
 
 # ReMeta Toolbox
 
