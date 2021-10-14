@@ -1,7 +1,3 @@
-Go directly to:
-- [**Start**](https://github.com/m-guggenmos/remeta/blob/master/demo/INSTALL.md)
-- [**Basic Usage**](https://github.com/m-guggenmos/remeta/blob/master/demo/basic_usage.ipynb)
-
 # ReMeta Toolbox: installation
 
 ReMeta can be installed with `pip`:
