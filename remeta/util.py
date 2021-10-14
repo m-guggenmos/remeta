@@ -6,6 +6,7 @@ from scipy.stats import rankdata
 
 
 TAB = '    '
+maxfloat = np.float128 if hasattr(np, 'float128') else np.longdouble
 
 
 class ReprMixin:

@@ -1,3 +1,5 @@
+import os
+import pathlib
 import pickle
 import warnings
 from dataclasses import make_dataclass
@@ -13,6 +15,7 @@ from .gendata import simu_data
 from .modelspec import Model, Data
 from .transform import warp, noise_meta_transform, noise_sens_transform, logistic, link_function, link_function_inv
 from .util import print_warnings, _check_param, TAB
+from .util import maxfloat
 
 np.set_printoptions(suppress=True)
 
@@ -85,9 +88,14 @@ class ReMeta:
 
         if verbose:
             print('\n+++ Sensory level +++')
-        with warnings.catch_warnings(record=True) as w:
+        # with warnings.catch_warnings(record=True) as w:
+        with warnings.catch_warnings():
+            warnings.filterwarnings('ignore', category=UserWarning, module='scipy.optimize',
+                                    message='delta_grad == 0.0. Check if the approximated function is linear. If the '
+                                            'function is linear better results can be obtained by defining the Hessian '
+                                            'as zero instead of using quasi-Newton approximations.')
             if ignore_warnings:
-                warnings.filterwarnings('ignore', module='scipy.optimize')
+                warnings.filterwarnings('ignore')
             if isinstance(precomputed_parameters, dict):
                 if not np.all([p in precomputed_parameters for p in self.cfg.paramset_sens.names]):
                     raise ValueError('Set of precomputed sensory parameters is incomplete.')
@@ -132,8 +140,8 @@ class ReMeta:
                                   stimulus_norm_coefficent=self.data.stimuli_unnorm_max)
             self.model.report_fit_sens(verbose)
 
-        if not ignore_warnings and verbose:
-            print_warnings(w)
+        # if not ignore_warnings and verbose:
+        #     print_warnings(w)
 
         if not self.cfg.skip_meta:
 
@@ -260,9 +268,9 @@ class ReMeta:
         cond_neg, cond_pos = stimuli_final < 0, stimuli_final >= 0
         dv_sens = np.full(stimuli_final.shape, np.nan)
         # dv_sens[cond_neg] = (np.abs(stimuli_final[cond_neg]) > thresh_sens[0]) * \
-        #                     (stimuli_final[cond_neg] - np.sign(stimuli_final[cond_neg]) * thresh_sens[0]) - bias_sens[0]
+        #                   (stimuli_final[cond_neg] - np.sign(stimuli_final[cond_neg]) * thresh_sens[0]) - bias_sens[0]
         # dv_sens[cond_pos] = (np.abs(stimuli_final[cond_pos]) > thresh_sens[1]) * \
-        #                     (stimuli_final[cond_pos] - np.sign(stimuli_final[cond_pos]) * thresh_sens[1]) - bias_sens[1]
+        #                   (stimuli_final[cond_pos] - np.sign(stimuli_final[cond_pos]) * thresh_sens[1]) - bias_sens[1]
         dv_sens[cond_neg] = (np.abs(stimuli_final[cond_neg]) > thresh_sens[0]) * stimuli_final[cond_neg] - bias_sens[0]
         dv_sens[cond_pos] = (np.abs(stimuli_final[cond_pos]) > thresh_sens[1]) * stimuli_final[cond_pos] - bias_sens[1]
 
@@ -366,7 +374,7 @@ class ReMeta:
                 likelihood = (dv_meta_from_conf > 1e-8) * window + \
                              (dv_meta_from_conf <= 1e-8) * dist.cdf(dv_meta_from_conf + binsize)
             if final:
-                likelihood_pdf = (dv_meta_from_conf > 1e-8) * dist.pdf(dv_meta_from_conf.astype(np.float128)).astype(
+                likelihood_pdf = (dv_meta_from_conf > 1e-8) * dist.pdf(dv_meta_from_conf.astype(maxfloat)).astype(
                     np.float64) + \
                                  (dv_meta_from_conf <= 1e-8) * dist.cdf(dv_meta_from_conf + binsize)
         else:
@@ -475,7 +483,7 @@ class ReMeta:
         # compute the probability of the actual confidence ratings given the pred confidence
         if self.cfg.meta_noise_model.startswith('censored_'):
             if self.cfg.meta_noise_model.endswith('gumbel'):
-                binsize = np.array(binsize).astype(np.float128)
+                binsize = np.array(binsize).astype(maxfloat)
             with warnings.catch_warnings():
                 warnings.simplefilter('ignore', RuntimeWarning)
                 window = (dist.cdf(np.minimum(1, self.data.confidence_2d + binsize)) -
@@ -486,12 +494,16 @@ class ReMeta:
             if final:
                 likelihood_pdf = \
                     (((self.data.confidence_2d > 1e-8) & (self.data.confidence_2d < 1 - 1e-8)) *
-                        dist.pdf(self.data.confidence_2d.astype(np.float128)) +
+                        dist.pdf(self.data.confidence_2d.astype(maxfloat)) +
                      (self.data.confidence_2d <= 1e-8) * dist.cdf(binsize) +
                         (self.data.confidence_2d >= 1 - 1e-8) * (1 - dist.cdf(1 - binsize))).astype(np.float64)
         else:
-            likelihood = dist.cdf(np.minimum(1, self.data.confidence_2d + binsize)) - \
-                         dist.cdf(np.maximum(0, self.data.confidence_2d - binsize))
+            with warnings.catch_warnings():
+                # catch this warning, which doesn't make any sense (output is valid if this happens)
+                warnings.filterwarnings('ignore', category=RuntimeWarning, module='scipy.stats',
+                                        message='divide by zero encountered in _beta_cdf')
+                likelihood = dist.cdf(np.minimum(1, self.data.confidence_2d + binsize)) - \
+                             dist.cdf(np.maximum(0, self.data.confidence_2d - binsize))  # noqa
             if final:
                 likelihood_pdf = dist.pdf(self.data.confidence_2d)
 
@@ -692,7 +704,8 @@ class ReMeta:
 
 def load_dataset(name, verbose=True):
     if name == 'simple':
-        stimuli, choices, confidence, cfg, params = pickle.load(open('example_data_simple.pkl', 'rb'))
+        path = os.path.join(pathlib.Path(__file__).parent.resolve(), 'demo', 'example_data_simple.pkl')
+        stimuli, choices, confidence, cfg, params = pickle.load(open(path, 'rb'))
     else:
         raise ValueError('Unknown dataset name')
 

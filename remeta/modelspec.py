@@ -237,11 +237,11 @@ class Model(ReprMixin):
                      hasattr(self.cfg.true_params[k], '__len__') else f' (true: {self.cfg.true_params[k]:.3f})')  # noqa
                 value_string = f"[{', '.join([f'{p:.3f}' for p in v])}]" if hasattr(v, '__len__') else f'{v:.3f}'
                 print(f'{TAB}[final] {k}: {value_string}{true_string}')
+            if hasattr(self.fit.fit_sens, 'execution_time'):
+                print(f'Final stats: {self.fit.fit_sens.execution_time:.2f} secs, {self.fit.fit_sens.nfev} fevs')
             print(f'Final neg. LL: {self.fit.fit_sens.negll:.2f}')
             if self.cfg.true_params is not None and hasattr(self.fit.fit_sens, 'negll_true'):
                 print(f'Neg. LL using true params: {self.fit.fit_sens.negll_true:.2f}')
-            if hasattr(self.fit.fit_sens, 'execution_time'):
-                print(f'Stats: {self.fit.fit_sens.execution_time:.2f} secs, {self.fit.fit_sens.nfev} fevs')
 
     def report_fit_meta(self, verbose=True):
         if self.cfg.true_params is not None:
@@ -264,13 +264,13 @@ class Model(ReprMixin):
                      hasattr(self.cfg.true_params[k], '__len__') else f' (true: {self.cfg.true_params[k]:.3f})')
                 value_string = f"[{', '.join([f'{p:.3f}' for p in v])}]" if hasattr(v, '__len__') else f'{v:.3f}'
                 print(f'{TAB}[final] {k}: {value_string}{true_string}')
+            if hasattr(self.fit.fit_meta, 'execution_time'):
+                print(f'Final stats: {self.fit.fit_meta.execution_time:.2f} secs, '
+                      f'{self.fit.fit_meta.nfev} fevs')
             print(f'Final neg. LL: {self.fit.fit_meta.negll:.2f}')
         if self.cfg.true_params is not None:
             if verbose:
                 print(f'Neg. LL using true params: {self.fit.fit_meta.negll_true:.2f}')
-        if verbose and hasattr(self.fit.fit_meta, 'execution_time'):
-            print(f'Stats: {self.fit.fit_meta.execution_time:.2f} secs, '
-                  f'{self.fit.fit_meta.nfev} fevs')
 
     def summary(self, extended=False, fun_meta=None, confidence_gen=None, confidence_emp=None):
 

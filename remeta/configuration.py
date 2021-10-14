@@ -8,7 +8,6 @@ from scipy.optimize.slsqp import _epsilon  # noqa
 from .modelspec import Parameter, ParameterSet
 from .util import ReprMixin
 
-
 @dataclass
 class Configuration(ReprMixin):
     """

@@ -1,8 +1,10 @@
-import numpy as np
 import warnings
-from scipy.stats import lognorm, beta, betaprime, gamma, uniform, gumbel_r
-from .fast_truncnorm import truncnorm
 
+import numpy as np
+from scipy.stats import lognorm, beta, betaprime, gamma, uniform, gumbel_r
+
+from .util import maxfloat
+from .fast_truncnorm import truncnorm
 
 META_NOISE_MODELS = (
     'beta', 'beta_std',
@@ -131,7 +133,7 @@ class truncated_gumbel:  # noqa
         self.cdf_a_to_b = self.dist.cdf(self.b) - self.cdf_to_a
 
     def pdf(self, x):
-        pdens = ((x > self.a) & (x < self.b)) * self.dist.pdf(np.float128(x)).astype(np.float64) / self.cdf_a_to_b
+        pdens = ((x > self.a) & (x < self.b)) * self.dist.pdf(maxfloat(x)).astype(np.float64) / self.cdf_a_to_b
         return pdens
 
     def cdf(self, x):
@@ -276,7 +278,7 @@ def get_likelihood(x, distname, mode, scale, lb=1e-8, ub=1 - 1e-8, binsize_meta=
         likelihood_dist = distname[distname.find('_') + 1:]
         dist = get_dist(likelihood_dist, mode=mode, scale=scale)
         if distname.endswith('gumbel'):
-            x = x.astype(np.float128)
+            x = x.astype(maxfloat)
         window = (dist.cdf(np.minimum(1, x + binsize_meta)) -
                   dist.cdf(np.maximum(0, x - binsize_meta))).astype(np.float64)
         with warnings.catch_warnings():

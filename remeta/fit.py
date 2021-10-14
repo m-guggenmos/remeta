@@ -114,7 +114,7 @@ def fmincon(fun, param_set, args, gridsearch=False, grid_multiproc=True,
             for i, p in enumerate(param_set.names):
                 print(f'{TAB}[grid] {p}: {x0[i]:.4g}')
             print(f"Grid neg. LL: {ll_min_grid:.1f}")
-            print(f"Grid stats: {grid_time:.2f} secs")
+            print(f"Grid runtime: {grid_time:.2f} secs")
         fit_grid = OptimizeResult(success=True, x=x0, fun=ll_min_grid, nfev=len(valid))
     else:
         x0 = param_set.guess

@@ -5,6 +5,7 @@ from scipy.special import erf, erfinv
 from scipy.special import factorial as fac
 from scipy.stats import norm
 
+from .util import maxfloat
 from .util import _check_param, _check_criteria
 
 
@@ -69,7 +70,7 @@ def logistic(x, noise_sens):
         Posterior probability under a logistic model.
     """
     posterior = 1 / (1 + np.exp(-((np.pi / np.sqrt(3)) * x / np.maximum(noise_sens, 1.6e-4)).squeeze(),
-                                dtype=np.float128))
+                                dtype=maxfloat))
     return posterior.astype(np.float64)
 
 
