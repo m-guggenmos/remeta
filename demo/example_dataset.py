@@ -1,6 +1,8 @@
 import pickle
 import numpy as np
 from remeta.gendata import simu_data  # noqa
+import os
+import pathlib
 
 np.random.seed(1)
 
@@ -16,4 +18,5 @@ cfg = None
 data = simu_data(nsubjects=1, nsamples=2000, params=params, cfg=cfg, stimuli_ext=None, verbose=True,
                  stimuli_stepsize=0.25, squeeze=True)
 
-pickle.dump((data.stimuli, data.choices, data.confidence, data.cfg, params), open('example_data_simple.pkl', 'wb'))
+path = os.path.join(pathlib.Path(__file__).parent.resolve(), '..', 'remeta', 'data', 'example_data_simple.pkl')
+pickle.dump((data.stimuli, data.choices, data.confidence, data.cfg, params), open(path, 'wb'))

@@ -23,7 +23,7 @@ INSTALL_REQUIRES = [
     "matplotlib>=3.1.3",
 ]
 
-PACKAGES = ["remeta"]
+PACKAGES = ["remeta", "remeta.data"]
 
 try:
     from setuptools import setup

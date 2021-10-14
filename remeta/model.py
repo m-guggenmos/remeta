@@ -704,7 +704,7 @@ class ReMeta:
 
 def load_dataset(name, verbose=True):
     if name == 'simple':
-        path = os.path.join(pathlib.Path(__file__).parent.resolve(), 'demo', 'example_data_simple.pkl')
+        path = os.path.join(pathlib.Path(__file__).parent.resolve(), 'data', 'example_data_simple.pkl')
         stimuli, choices, confidence, cfg, params = pickle.load(open(path, 'rb'))
     else:
         raise ValueError('Unknown dataset name')
