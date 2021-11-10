@@ -311,6 +311,8 @@ def link_function(dv_meta, link_fun, slope_meta=1, scaling_meta=1, criteria_meta
         criteria_meta_ = _check_criteria(criteria_meta)
     if levels_meta is not None:
         levels_meta_ = _check_criteria(levels_meta)
+    else:
+        levels_meta_ = None
     if link_fun.startswith('detection_model') and link_fun.endswith('_scaled'):
         dv_meta = np.minimum(nchannels, slope_meta * dv_meta)
 
@@ -561,7 +563,8 @@ def link_function_inv(confidence, link_fun, slope_meta=1, scaling_meta=1, criter
             else:
                 noise_sens = _noise_sens_transform_pc(
                     stimuli, dv_sens, slope_meta=slope_meta_, noise_sens=noise_sens,
-                    noise_transform_sens=noise_transform_sens, function_noise_transform_sens=function_noise_transform_sens,
+                    noise_transform_sens=noise_transform_sens,
+                    function_noise_transform_sens=function_noise_transform_sens,
                 )
             dv_meta = (2 * np.sqrt(3) * noise_sens / np.pi) * np.arctanh(confidence)
         elif 'criteria_linear_tanh' in link_fun:
