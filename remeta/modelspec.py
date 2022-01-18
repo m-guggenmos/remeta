@@ -337,9 +337,15 @@ class Model(ReprMixin):
         model_summary = make_dataclass('ModelSummary', desc.keys())
 
         def _repr(self_):
-            txt = f'{self_.__class__.__name__}\n'
-            txt += '\n'.join([f"\t{k}: {'<not displayed>' if k in ('data', 'fit') else v}"
-                              for k, v in self_.__dict__.items()])
+            txt = f'{self_.__class__.__name__}'
+            for k, v in self_.__dict__.items():
+                if k in ('data', 'fit'):
+                    txt += f"\n\t{k}: <not displayed>"
+                elif k == 'extended':
+                    txt += f"\n\t{k}: additional modeling results (attributes: " \
+                           f"{', '.join([a for a in self_.extended.__dict__.keys()])})"
+                else:
+                    txt += f"\n\t{k}: {v}"
             return txt
 
         model_summary.__repr__ = _repr
