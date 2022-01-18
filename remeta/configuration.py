@@ -252,7 +252,7 @@ class Configuration(ReprMixin):
     _noise_sens_default: Parameter = Parameter(guess=0.1, bounds=(1e-3, 100), grid_range=np.arange(0.1, 0.9, 0.25))
     _thresh_sens_default: Parameter = Parameter(guess=0, bounds=(0, 1), grid_range=np.arange(0, 0.41, 0.2))
     _bias_sens_default: Parameter = Parameter(guess=0, bounds=(-1, 1), grid_range=np.arange(-0.1, 0.11, 0.1))
-    _noise_meta_default: Parameter = Parameter(guess=0.2, bounds=(1e-5, 5), grid_range=np.arange(0.05, 1, 0.1))
+    _noise_meta_default: Parameter = Parameter(guess=0.2, bounds=(1e-5, 50), grid_range=np.arange(0.05, 1, 0.1))
     _noise_transform_meta_default: Parameter = Parameter(guess=0, bounds=(0, 10),
                                                          grid_range=np.arange(0, 1.1, 0.25))
     _readout_term_meta_default: Parameter = Parameter(guess=0, bounds=(-1, 1), grid_range=np.arange(-0.2, 0.21, 0.1))
