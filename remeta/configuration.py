@@ -185,7 +185,7 @@ class Configuration(ReprMixin):
 
     skip_meta: bool = False
     meta_noise_type: str = 'noisy_report'
-    meta_noise_model: str = 'beta'
+    meta_noise_model: str = 'truncated_norm'
     meta_link_function: str = 'probability_correct'
     detection_model: bool = False
     detection_model_nchannels: int = 10
