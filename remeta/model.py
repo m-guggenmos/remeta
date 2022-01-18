@@ -227,7 +227,11 @@ class ReMeta:
 
         def repr_(self_):
             txt = f'***{self_.__class__.__name__}***\n'
-            txt += '\n'.join([f'{k}: {v}' for k, v in self_.__dict__.items()])
+            for k, v in self_.__dict__.items():
+                if k == 'cfg':
+                    txt += f"\n{k}: {type(desc['cfg'])} <not displayed>"
+                else:
+                    txt += f"\n{k}: {v}"
             return txt
 
         summary_.__repr__ = repr_
