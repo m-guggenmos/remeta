@@ -1,14 +1,14 @@
 import warnings
 
 import numpy as np
-from scipy.stats import lognorm, beta, betaprime, gamma, uniform, gumbel_r
+from scipy.stats import norm, lognorm, beta, betaprime, gamma, uniform, gumbel_r
 
 from .util import maxfloat
 from .fast_truncnorm import truncnorm
 
 META_NOISE_MODELS = (
     'beta', 'beta_std',
-    'lognorm', 'lognorm_varstd', 'betaprime', 'gamma',
+    'norm', 'lognorm', 'lognorm_varstd', 'betaprime', 'gamma',
     'censored_norm', 'censored_gumbel', 'censored_lognorm', 'censored_lognorm_varstd',
     'censored_betaprime', 'censored_gamma',
     'truncated_norm', 'truncated_norm_lookup', 'truncated_norm_fit',
@@ -175,6 +175,10 @@ def get_dist(meta_noise_model, mode, scale, meta_noise_type='noisy_report', look
     else:
         distname = meta_noise_model
 
+    if distname == 'norm':
+        dist = norm(loc=mode, scale=scale)
+    if distname == 'lognorm_varstd':
+        dist = lognorm(loc=0, scale=np.maximum(1e-5, mode) * np.exp(scale ** 2), s=scale)
     if distname == 'lognorm':
         shape, scale = _lognorm_params(np.maximum(1e-5, mode), scale)
         dist = lognorm(loc=0, scale=scale, s=shape)
