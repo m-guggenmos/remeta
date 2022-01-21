@@ -422,9 +422,10 @@ def plot_confidence_dist(cfg, stimuli, confidence, params_sens, params_meta, nsa
             bins[k] += [hist[1]]
             counts_gen[k] += [np.histogram(generative.confidence[np.tile(stimuli, (nsamples_gen, 1)) == v],
                                            density=True, bins=bins[k][i])[0] / (len(bins[k][i]) - 1)]
-    counts = np.array(counts) / np.max(counts)
-    counts_gen = np.array(counts_gen) / np.max(counts_gen)
-    bins = np.array(bins)
+    # counts = np.array(counts) / np.max(counts)
+    # counts_gen = np.array(counts_gen) / np.max(counts_gen)
+    counts = [np.array(count) / np.max([np.max(c) for c in counts]) for count in counts]
+    counts_gen = [np.array(count) / np.max([np.max(c) for c in counts_gen]) for count in counts_gen]
 
     ax = plt.gca()
 
@@ -442,11 +443,11 @@ def plot_confidence_dist(cfg, stimuli, confidence, params_sens, params_meta, nsa
 
         for i, v in enumerate(levels_):
 
-            plt.barh(y=bins[k, i][:-1] + np.diff(bins[k, i]) / 2, width=((1, -1)[k]) * 0.26 * counts[k, i],
+            plt.barh(y=bins[k][i][:-1] + np.diff(bins[k][i]) / 2, width=((1, -1)[k]) * 0.26 * counts[k][i],
                      height=1 / nbins, left=0.005 + v, color=color_data, linewidth=0, alpha=1, zorder=10,
                      label='Data: histogram' if ((k == 0) & (i == 0)) else None)
 
-            plt.plot(v + (1, -1)[k] * 0.26 * counts_gen[k, i], bins[k, i][:-1] + (bins[k, i][1] - bins[k, i][0]) / 2,
+            plt.plot(v + (1, -1)[k] * 0.26 * counts_gen[k][i], bins[k][i][:-1] + (bins[k][i][1] - bins[k][i][0]) / 2,
                      color=color_generative_meta, zorder=11, lw=2,
                      label='Generative model' if ((k == 0) & (i == 0)) else None)
 
