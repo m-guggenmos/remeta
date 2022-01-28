@@ -441,9 +441,31 @@ class ReMeta:
             Negative (summed) log likelihood.
         """
 
+        params_meta, noise_meta, model_confidence, dist, dv_meta_considered, likelihood, likelihood_pdf, punishment_factor = \
+            self._helper_negll_meta_noisyreport(params, ignore_warnings, mock_binsize, final, return_noise,
+                                                return_criteria, return_levels, constraint_mode)
+
+        # compute weighted cumulative negative log likelihood
+        likelihood_weighted_cum = np.nansum(likelihood * self.model.dv_sens_pmf, axis=1)
+        negll = -np.sum(np.log(np.maximum(likelihood_weighted_cum, self.cfg.min_likelihood)))
+        negll *= punishment_factor
+
+        if final:
+            return negll, params_meta, noise_meta, likelihood, dv_meta_considered, likelihood_weighted_cum, \
+                   likelihood_pdf  # noqa
+        elif mock_binsize is not None:
+            return negll, likelihood
+        else:
+            return negll
+
+
+    def _helper_negll_meta_noisyreport(self, params, ignore_warnings, mock_binsize, final, return_noise,
+                                       return_criteria, return_levels, constraint_mode):
+
         bl = self.cfg.paramset_meta.base_len
         params_meta = {p: params[int(np.sum(bl[:i]))] if n == 1 else [params[int(np.sum(bl[:i])) + j] for j in range(n)]
                        for i, (p, n) in enumerate(zip(self.cfg.paramset_meta.base_names, bl))}
+
         punishment_factor = 1
 
         if '_criteria' in self.cfg.meta_link_function:
@@ -501,6 +523,8 @@ class ReMeta:
                         dist.pdf(self.data.confidence_2d.astype(maxfloat)) +
                      (self.data.confidence_2d <= 1e-8) * dist.cdf(binsize) +
                         (self.data.confidence_2d >= 1 - 1e-8) * (1 - dist.cdf(1 - binsize))).astype(np.float64)
+            else:
+                likelihood_pdf = None
         else:
             with warnings.catch_warnings():
                 # catch this warning, which doesn't make any sense (output is valid if this happens)
@@ -510,6 +534,8 @@ class ReMeta:
                              dist.cdf(np.maximum(0, self.data.confidence_2d - binsize))  # noqa
             if final:
                 likelihood_pdf = dist.pdf(self.data.confidence_2d)
+            else:
+                likelihood_pdf = None
 
         if not self.cfg.detection_model:
             invalid = np.sign(self.model.dv_sens_considered) != np.sign(self.data.choices_2d - 0.5)
@@ -517,20 +543,8 @@ class ReMeta:
             self.model.dv_sens_pmf[invalid] = np.nan
             self.model.confidence[invalid] = np.nan
 
-        # compute weighted cumulative negative log likelihood
-        likelihood_weighted_cum = np.nansum(likelihood * self.model.dv_sens_pmf, axis=1)
-        negll = -np.sum(np.log(np.maximum(likelihood_weighted_cum, 1e-10)))
-        negll *= punishment_factor
-
-        # print(params, negll)
-
-        if final:
-            return negll, params_meta, noise_meta, likelihood, dv_meta_considered, likelihood_weighted_cum, \
-                   likelihood_pdf  # noqa
-        elif mock_binsize is not None:
-            return negll, likelihood
-        else:
-            return negll
+        return params_meta, noise_meta, self.model.confidence, dist, dv_meta_considered, likelihood, likelihood_pdf, \
+               punishment_factor
 
     def _noise_sens_transform(self, stimuli=None, params_sens=None):
         """
