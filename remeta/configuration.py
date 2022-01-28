@@ -234,7 +234,7 @@ class Configuration(ReprMixin):
     normalize_stimuli_by_max: bool = True
     confidence_bounds_error: float = 0
 
-    binsize_meta: float = 1e-3
+    binsize_meta: float = 1e-1
     max_dv_deviation: int = 5
     nbins_dv: int = 101
 
@@ -246,6 +246,7 @@ class Configuration(ReprMixin):
     noise_sens_default: float = 0.001
     noise_meta_default: float = 0.1
     noise_meta_min: float = 0.001
+    min_likelihood: float = 1e-10
 
     _warping_sens_default: Parameter = Parameter(guess=0.1, bounds=(-10, 10), grid_range=np.arange(-10, 11, 5))
     _noise_transform_sens_default: Parameter = Parameter(guess=0, bounds=(0, 10), grid_range=np.arange(0, 1.1, 0.25))
