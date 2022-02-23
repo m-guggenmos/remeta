@@ -291,7 +291,7 @@ class ReMeta:
         else:
             posterior = logistic(dv_sens, noise_sens)
         choiceprob = (self.data.choices == 1) * posterior + (self.data.choices == 0) * (1 - posterior)
-        negll = np.sum(-np.log(np.maximum(choiceprob, 1e-10)))
+        negll = np.sum(-np.log(np.maximum(choiceprob, self.cfg.min_likelihood_sens)))
 
         return (negll, params_sens, choiceprob, posterior, stimuli_final) if final else negll
 
@@ -393,7 +393,7 @@ class ReMeta:
 
         # compute log likelihood
         likelihood_weighted_cum = np.nansum(self.model.dv_sens_pmf * likelihood, axis=1)
-        negll = -np.sum(np.log(np.maximum(likelihood_weighted_cum, 1e-10)))
+        negll = -np.sum(np.log(np.maximum(likelihood_weighted_cum, self.cfg.min_likelihood_meta)))
         negll *= punishment_factor
 
         if final:
@@ -447,7 +447,7 @@ class ReMeta:
 
         # compute weighted cumulative negative log likelihood
         likelihood_weighted_cum = np.nansum(likelihood * self.model.dv_sens_pmf, axis=1)
-        negll = -np.sum(np.log(np.maximum(likelihood_weighted_cum, self.cfg.min_likelihood)))
+        negll = -np.sum(np.log(np.maximum(likelihood_weighted_cum, self.cfg.min_likelihood_meta)))
         negll *= punishment_factor
 
         if final:
