@@ -250,7 +250,7 @@ def noise_meta_transform(confidence_or_dv_meta, dv_sens=None, noise_meta=None, n
     return noise_meta_transformed
 
 
-def link_function(dv_meta, link_fun, slope_meta=1, scaling_meta=1, criteria_meta=None, levels_meta=None,
+def link_function(dv_meta, link_fun, slope_meta=1, confidence_term_meta=0, scaling_meta=1, criteria_meta=None, levels_meta=None,
                   noise_sens=None, noise_transform_sens=None, function_noise_transform_sens='linear',
                   dv_sens=None, stimuli=None, constraint_mode=False, nchannels=10,
                   **kwargs):  # noqa
@@ -269,6 +269,8 @@ def link_function(dv_meta, link_fun, slope_meta=1, scaling_meta=1, criteria_meta
                          '{x}_criteria', '{x}_criteria_linear', '{x}_criteria_linear_tanh', '{x}_criteria_variable'
     slope_meta : float or array-like
         Confidence slope parameter.
+    confidence_term_meta : float or array-like
+        Confidence term parameter.
     scaling_meta : float or array-like
         Confidence scaling parameter.
     criteria_meta : array-like
@@ -300,11 +302,13 @@ def link_function(dv_meta, link_fun, slope_meta=1, scaling_meta=1, criteria_meta
     """
     dv_meta = np.atleast_1d(dv_meta)
     if dv_sens is None:
-        if hasattr(slope_meta, '__len__') or hasattr(scaling_meta, '__len__'):
-            raise ValueError('Parameters slope_meta or scaling_meta appear to be sign-dependent (they have been passt '
-                             'as array-like), but dv_sens has not been provided.')
+        if hasattr(slope_meta, '__len__') or hasattr(confidence_term_meta, '__len__') or \
+                hasattr(scaling_meta, '__len__'):
+            raise ValueError('Parameters slope_meta, confidence_term_meta or scaling_meta appear to be sign-dependent '
+                             '(they have been passed as array-like), but dv_sens has not been provided.')
         else:
             dv_sens = dv_meta
+    confidence_term_meta_ = _check_param(confidence_term_meta)
     slope_meta_ = _check_param(slope_meta)
     scaling_meta_ = _check_param(scaling_meta)
     if criteria_meta is not None:
@@ -472,16 +476,16 @@ def link_function(dv_meta, link_fun, slope_meta=1, scaling_meta=1, criteria_meta
     else:
         raise ValueError(f'{link_fun} is not a valid link function for the metacognitive type noisy-report')
 
-    confidence_pred[dv_sens < 0] *= scaling_meta_[0]
-    confidence_pred[dv_sens >= 0] *= scaling_meta_[1]
+    confidence_pred[dv_sens < 0] = confidence_pred[dv_sens < 0] * scaling_meta_[0] + confidence_term_meta_[0]
+    confidence_pred[dv_sens >= 0] = confidence_pred[dv_sens >= 0] * scaling_meta_[1] + confidence_term_meta_[1]
     confidence_pred = np.maximum(0, np.minimum(1, confidence_pred))
 
     return confidence_pred
 
 
-def link_function_inv(confidence, link_fun, slope_meta=1, scaling_meta=1, criteria_meta=None, levels_meta=None,
-                      noise_sens=None, noise_transform_sens=None, function_noise_transform_sens='linear',
-                      dv_sens=None, stimuli=None,
+def link_function_inv(confidence, link_fun, slope_meta=1, confidence_term_meta=0, scaling_meta=1, criteria_meta=None,
+                      levels_meta=None, noise_sens=None, noise_transform_sens=None,
+                      function_noise_transform_sens='linear', dv_sens=None, stimuli=None,
                       **kwargs):  ## noqa
     """
     Inverse link function.
@@ -498,6 +502,8 @@ def link_function_inv(confidence, link_fun, slope_meta=1, scaling_meta=1, criter
                          '{x}_criteria', '{x}_criteria_linear', '{x}_criteria_linear_tanh', '{x}_criteria_variable'
     slope_meta : float or array-like
         Confidence slope parameter.
+    confidence_term_meta : float or array-like
+        Confidence term parameter.
     scaling_meta : float or array-like
         Confidence scaling parameter.
     criteria_meta : array-like
@@ -524,18 +530,21 @@ def link_function_inv(confidence, link_fun, slope_meta=1, scaling_meta=1, criter
         Absolute sensory decision values ('dv_meta').
     """
     if dv_sens is None:
-        if hasattr(slope_meta, '__len__') or hasattr(scaling_meta, '__len__'):
-            raise ValueError('Parameters slope_meta or scaling_meta appear to be sign-dependent (they have been passt '
-                             'as array-like), but dv_sens has not been provided.')
+        if hasattr(slope_meta, '__len__') or hasattr(confidence_term_meta, '__len__') or \
+                hasattr(scaling_meta, '__len__'):
+            raise ValueError('Parameters slope_meta, confididence_term_meta or scaling_meta appear to be sign-dependent'
+                             ' (they have been passed as array-like), but dv_sens has not been provided.')
         else:
             dv_sens = confidence
     else:
         confidence = np.tile(confidence, dv_sens.shape[-1])
     slope_meta_ = _check_param(slope_meta)
+    confidence_term_meta_ = _check_param(confidence_term_meta)
     scaling_meta_ = _check_param(scaling_meta)
 
-    confidence[dv_sens < 0] = np.minimum(1, confidence[dv_sens < 0] / scaling_meta_[0])
-    confidence[dv_sens >= 0] = np.minimum(1, confidence[dv_sens >= 0] / scaling_meta_[1])
+    confidence[dv_sens < 0] = (confidence[dv_sens < 0] - confidence_term_meta_[0]) / scaling_meta_[0]
+    confidence[dv_sens >= 0] = (confidence[dv_sens >= 0] - confidence_term_meta_[1]) / scaling_meta_[1]
+    confidence = np.minimum(1, confidence)
 
     if link_fun in ['tanh', 'erf', 'alg', 'guder', 'linear', 'logistic3']:
         if link_fun != 'linear':

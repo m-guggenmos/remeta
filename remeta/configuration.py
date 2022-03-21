@@ -70,8 +70,10 @@ class Configuration(ReprMixin):
     enable_slope_meta : int (default: 0)
         Fit a slope parameter for the link function. In the case of a criterion-based link function, multiple
         parameters are fitted for each criterion/confidence level.
+    enable_confidence_term_meta : int (default: 0)
+        Fit an additive metacognitive bias at report.
     enable_scaling_meta : int (default: 0)
-        Fit a confidence scaling parameter. Note that this works only for noisy-report models.
+        Fit a confidence scaling parameter.
     enable_criteria_meta : int (default: 0)
         Fit criteria for a criterion-based link function. Note that the number of criteria is set via the link function
         argument (see `meta_link_function`)
@@ -112,6 +114,8 @@ class Configuration(ReprMixin):
         Parameter for the metacognitive readout term.
     slope_meta : Union[Parameter, List[Parameter]]
         Parameter for the link function slope.
+    confidence_term_meta : Union[Parameter, List[Parameter]]
+        Parameter for the metacognitive report term.
     scaling_meta : Union[Parameter, List[Parameter]]
         Parameter for confidence scaling.
     criterion{x}_meta : Union[Parameter, List[Parameter]]
@@ -199,6 +203,7 @@ class Configuration(ReprMixin):
     enable_noise_transform_meta: int = 0
     enable_readout_term_meta: int = 0
     enable_slope_meta: int = 1
+    enable_confidence_term_meta: int = 0
     enable_scaling_meta: int = 0
     enable_criteria_meta: int = 0
     enable_levels_meta: int = 0
@@ -215,6 +220,7 @@ class Configuration(ReprMixin):
     noise_transform_meta: Union[Parameter, List[Parameter]] = None
     readout_term_meta: Union[Parameter, List[Parameter]] = None
     slope_meta: Union[Parameter, List[Parameter]] = None
+    confidence_term_meta: Union[Parameter, List[Parameter]] = None
     scaling_meta: Union[Parameter, List[Parameter]] = None
 
     constraints_sens_callable: Callable = None
@@ -259,6 +265,7 @@ class Configuration(ReprMixin):
                                                          grid_range=np.arange(0, 1.1, 0.25))
     _readout_term_meta_default: Parameter = Parameter(guess=0, bounds=(-1, 1), grid_range=np.arange(-0.2, 0.21, 0.1))
     _slope_meta_default: Parameter = Parameter(guess=1, bounds=(0.1, 50), grid_range=np.arange(0.2, 1.71, 0.3))
+    _confidence_term_meta_default: Parameter = Parameter(guess=0, bounds=(-1, 1), grid_range=np.arange(-0.3, 0.31, 0.15))
     _scaling_meta_default: Parameter = Parameter(guess=1, bounds=(0.1, 10), grid_range=np.arange(0.5, 2.01, 0.3))
     _criterion_meta_default: Parameter = Parameter(guess=0, bounds=(1e-6, 50),
                                                    grid_range=np.exp(np.linspace(0, np.log(2), 8)) - 0.9)
@@ -314,9 +321,6 @@ class Configuration(ReprMixin):
             raise ValueError('A criterion-based link function was set, but confidence criteria were not enabled.')
 
         if not self.settings_ignore_warnings:
-            if self.enable_slope_meta and self.enable_scaling_meta and not self.force_settings:
-                warnings.warn('The combination enable_slope_meta=True and enable_scaling_meta=True likely '
-                              'leads to imprecise estimates.')
             if self.enable_criteria_meta and '_criteria' not in self.meta_link_function:
                 self.enable_criteria_meta = 0
                 warnings.warn('Confidence criteria were enabled but no criterion-based link function was set -> '
@@ -330,11 +334,16 @@ class Configuration(ReprMixin):
                 warnings.warn(f'Confidence leves were enabled, but confidence criteria not -> auto-setting'
                               f'enable_criteria_meta = {self.enable_levels_meta}')
 
-            if (self.meta_noise_type == 'noisy_readout') and self.enable_scaling_meta:
-                warnings.warn('The setting enable_scaling_meta has been enabled for a model of type noisy-readout. '
-                              'Use this only if you have strong reasons to belief that values of the confidence '
-                              'scaling parameter are <= 1, since true values > 1 cannot be recovered for noisy-readout '
-                              'models.')
+            if self.meta_noise_type == 'noisy_readout':
+                if self.enable_confidence_term_meta:
+                    warnings.warn('The setting enable_confidence_term_meta has been enabled for a model of type '
+                                  'noisy-readout. This setting results in a link function that is not monotonically '
+                                  'increasing and likely leads to biased estimates.')
+                if self.enable_scaling_meta:
+                    warnings.warn('The setting enable_scaling_meta has been enabled for a model of type noisy-readout. '
+                                  'Use this only if you have strong reasons to belief that values of the confidence '
+                                  'scaling parameter are <= 1, since true values > 1 cannot be recovered for '
+                                  'noisy-readout models.')
 
             if self.enable_criteria_meta and self.enable_slope_meta:
                 self.enable_slope_meta = 0
@@ -374,7 +383,7 @@ class Configuration(ReprMixin):
                     self._noise_meta_default.bounds = (1e-5, 250)
 
             param_names_meta = []
-            params_meta = ('noise', 'noise_transform', 'readout_term', 'slope', 'scaling')
+            params_meta = ('noise', 'noise_transform', 'readout_term', 'slope', 'confidence_term', 'scaling')
             for param in params_meta:
                 if getattr(self, f'enable_{param}_meta'):
                     param_names_meta += [f'{param}_meta']

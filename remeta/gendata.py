@@ -110,7 +110,7 @@ def simu_data(nsubjects, nsamples, params, cfg=None, stimuli_ext=None, verbose=T
     for p in ('warping', 'thresh', 'bias', 'noise_transform'):
         if not getattr(cfg, f'enable_{p}_sens'):
             params.pop(f'{p}_sens', None)
-    for p in ('readout_term', 'noise_transform', 'scaling', 'slope'):
+    for p in ('readout_term', 'noise_transform', 'confidence_term', 'scaling', 'slope'):
         if not getattr(cfg, f'enable_{p}_meta'):
             params.pop(f'{p}_meta', None)
     if not cfg.enable_noise_sens:
