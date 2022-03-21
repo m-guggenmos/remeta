@@ -73,6 +73,7 @@ _Type 2 (metacognitive) parameters:_
 - `noise_meta`: metacognitive noise
 - `readout_term_meta`: additive metacognitive bias at the readout of type 1 decision values
 - `slope_meta`: multiplicative metacognitive bias applying to the estimation of type 1 noise
+- `confidence_term_meta`: additive metacognitive bias applying to confidence reports
 - `scaling_meta`: multiplicative metacognitive bias applying to confidence reports
 - `noise_transform_meta`: parameter to specify decision-value-dependent type 2 noise (e.g. multiplicative noise)
 - `criterion{i}_meta`: i-th confidence criterion (in case of a criterion-based link function)
