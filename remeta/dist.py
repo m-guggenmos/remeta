@@ -177,9 +177,11 @@ def get_dist(meta_noise_model, mode, scale, meta_noise_type='noisy_report', look
 
     if distname == 'norm':
         dist = norm(loc=mode, scale=scale)
-    if distname == 'lognorm_varstd':
+    elif distname == 'gumbel':
+        dist = gumbel_r(loc=mode, scale=scale * np.sqrt(6) / np.pi)
+    elif distname == 'lognorm_varstd':
         dist = lognorm(loc=0, scale=np.maximum(1e-5, mode) * np.exp(scale ** 2), s=scale)
-    if distname == 'lognorm':
+    elif distname == 'lognorm':
         shape, scale = _lognorm_params(np.maximum(1e-5, mode), scale)
         dist = lognorm(loc=0, scale=scale, s=shape)
     elif distname == 'lognorm_varstd':
