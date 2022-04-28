@@ -8,7 +8,7 @@ from .fast_truncnorm import truncnorm
 
 META_NOISE_MODELS = (
     'beta', 'beta_std',
-    'norm', 'lognorm', 'lognorm_varstd', 'betaprime', 'gamma',
+    'norm', 'gumbel', 'lognorm', 'lognorm_varstd', 'betaprime', 'gamma',
     'censored_norm', 'censored_gumbel', 'censored_lognorm', 'censored_lognorm_varstd',
     'censored_betaprime', 'censored_gamma',
     'truncated_norm', 'truncated_norm_lookup', 'truncated_norm_fit',
