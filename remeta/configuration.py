@@ -8,6 +8,7 @@ from scipy.optimize.slsqp import _epsilon  # noqa
 from .modelspec import Parameter, ParameterSet
 from .util import ReprMixin
 
+
 @dataclass
 class Configuration(ReprMixin):
     """
@@ -63,17 +64,21 @@ class Configuration(ReprMixin):
         Fit a metacognitive noise parameter
     enable_noise_transform_meta : int (default: 0)
         Fit an additional metacognitive noise parameter for signal-dependent metacognitive noise (the type of dependency
-        is is defined via `function_noise_transform_meta`). Note: at present, enable_noise_transform_meta=2 leads to
+        is defined via `function_noise_transform_meta`). Note: at present, enable_noise_transform_meta=2 leads to
         biased results and is therefore discouraged.
-    enable_readout_term_meta : int (default: 0)
-        Fit an additive metacognitive bias at readout.
-    enable_slope_meta : int (default: 0)
-        Fit a slope parameter for the link function. In the case of a criterion-based link function, multiple
-        parameters are fitted for each criterion/confidence level.
-    enable_confidence_term_meta : int (default: 0)
-        Fit an additive metacognitive bias at report.
-    enable_scaling_meta : int (default: 0)
-        Fit a confidence scaling parameter.
+    enable_evidence_bias_add_meta : int (default: 0)
+        Fit an additive metacognitive bias loading on sensory evidence.
+    evidence_bias_mult_meta : int (default: 0)
+        Fit a multiplicative metacognitive bias loading on evidence. In the case of a criterion-based link function,
+        multiple parameters are fitted for each criterion/confidence level.
+    evidence_bias_mult_postnoise_meta : int (default: 0)
+        Fit a multiplicative metacognitive bias loading on evidence, but operating after the application of readout
+        noise. In the case of a criterion-based link function, multiple parameters are fitted for each
+        criterion/confidence level.
+    enable_confidence_bias_mult_meta : int (default: 0)
+        Fit a multiplicative metacognitive bias loading on confidence.
+    enable_confidence_bias_add_meta : int (default: 0)
+        Fit an additive metacognitive bias loading on confidence.
     enable_criteria_meta : int (default: 0)
         Fit criteria for a criterion-based link function. Note that the number of criteria is set via the link function
         argument (see `meta_link_function`)
@@ -110,14 +115,16 @@ class Configuration(ReprMixin):
         Parameter for metacognitive noise.
     noise_transform_meta : Union[Parameter, List[Parameter]]
         Parameter for multiplicative megacognitive noise.
-    readout_term_meta : Union[Parameter, List[Parameter]]
-        Parameter for the metacognitive readout term.
-    slope_meta : Union[Parameter, List[Parameter]]
-        Parameter for the link function slope.
-    confidence_term_meta : Union[Parameter, List[Parameter]]
-        Parameter for the metacognitive report term.
-    scaling_meta : Union[Parameter, List[Parameter]]
-        Parameter for confidence scaling.
+    evidence_bias_mult_meta : Union[Parameter, List[Parameter]]
+        Parameter for multiplicative metacognitive bias loading on evidence.
+    evidence_bias_add_meta : Union[Parameter, List[Parameter]]
+        Parameter for additive metacognitive bias loading on evidence.
+    evidence_bias_mult_postnoise_meta : Union[Parameter, List[Parameter]]
+        Parameter for multiplicative metacognitive bias loading on evidence, but after the application of readout noise.
+    confidence_bias_mult_meta : Union[Parameter, List[Parameter]]
+        Parameter for multiplicative metacognitive bias loading on confidence.
+    confidence_bias_add_meta : Union[Parameter, List[Parameter]]
+        Parameter for additive metacognitive bias loading on confidence.
     criterion{x}_meta : Union[Parameter, List[Parameter]]
         Parameter for the xth confidence criterion (0-based).
     level{x}_meta : Union[Parameter, List[Parameter]]
@@ -145,10 +152,14 @@ class Configuration(ReprMixin):
         If True, use all available cores for the gridsearch search. If False, use a single core.
     global_minimization : bool (default: False)
         If True, use a global minimization routine.
+    gradient_method : str or Tuple/List (default: 'slsqp')
+        Set scipy.optimize.minimize gradient method
+        If provided as Tuple/List, test different gradient methods and take the best
     gradient_free : bool (default: None)
         If True, use a gradien-free optimization routine.
-    slsqp_epsilon : float (default: None)
-        Set parameter epsilon parameter for the slsqp optimization method.
+    slsqp_epsilon : float or Tuple/List (default: None)
+        Set parameter epsilon parameter for the SLSQP optimization method.
+        If provided as Tuple/List, test different eps parameters and take the best
 
     *** Transformation functions ***
     function_warping_sens: str (default: 'power')
@@ -166,13 +177,20 @@ class Configuration(ReprMixin):
         'finger errors' are assumed for values close to the scale's extremes.
 
     *** Parameters for the metacognitive likelihood computation ***
+    min_likelihood_sens : float
+        Minimum probability used during the sensory likelihood computation
+    min_likelihood_meta : float
+        Minimum probability used during the metacognitive likelihood computation
+    binsize_meta : float
+        Integration bin size for the computation of the likelihood around empirical confidence values (noisy-report)
+        or metacognitive evidence (noisy-readout).
     max_dv_deviation : int
         Number of standard deviations around the mean considered for sensory uncertainty.
     nbins_dv : int
         Number of discrete decision values bins that are considered to represent sensory uncertainty.
-    binsize_meta : float
-        Integration bin size for the computation of the likelihood around empirical confidence values (noisy-report)
-        or metacognitive evidence (noisy-readout).
+    experimental_likelihood : bool
+        Instead of using a minimum probability during the likelihood computation, use a maximum cumulative
+        likelihood based on a 'guessing' model
 
     *** Other ***
     true_params : Dict
@@ -201,10 +219,11 @@ class Configuration(ReprMixin):
     enable_bias_sens: int = 1
     enable_noise_meta: int = 1
     enable_noise_transform_meta: int = 0
-    enable_readout_term_meta: int = 0
-    enable_slope_meta: int = 1
-    enable_confidence_term_meta: int = 0
-    enable_scaling_meta: int = 0
+    enable_evidence_bias_mult_meta: int = 1
+    enable_evidence_bias_add_meta: int = 1
+    enable_evidence_bias_mult_postnoise_meta: int = 0
+    enable_confidence_bias_mult_meta: int = 0
+    enable_confidence_bias_add_meta: int = 0
     enable_criteria_meta: int = 0
     enable_levels_meta: int = 0
 
@@ -218,10 +237,11 @@ class Configuration(ReprMixin):
     bias_sens: Union[Parameter, List[Parameter]] = None
     noise_meta: Union[Parameter, List[Parameter]] = None
     noise_transform_meta: Union[Parameter, List[Parameter]] = None
-    readout_term_meta: Union[Parameter, List[Parameter]] = None
-    slope_meta: Union[Parameter, List[Parameter]] = None
-    confidence_term_meta: Union[Parameter, List[Parameter]] = None
-    scaling_meta: Union[Parameter, List[Parameter]] = None
+    evidence_bias_mult_meta: Union[Parameter, List[Parameter]] = None
+    evidence_bias_add_meta: Union[Parameter, List[Parameter]] = None
+    evidence_bias_mult_postnoise_meta: Union[Parameter, List[Parameter]] = None
+    confidence_bias_mult_meta: Union[Parameter, List[Parameter]] = None
+    confidence_bias_add_meta: Union[Parameter, List[Parameter]] = None
 
     constraints_sens_callable: Callable = None
     constraints_meta_callable: Callable = None
@@ -234,6 +254,7 @@ class Configuration(ReprMixin):
     fine_gridsearch: bool = False
     grid_multiproc: bool = False
     global_minimization: bool = False
+    gradient_method: str = 'slsqp'
     gradient_free: bool = None
     slsqp_epsilon: float = None
 
@@ -245,6 +266,9 @@ class Configuration(ReprMixin):
     binsize_meta: float = 1e-1
     max_dv_deviation: int = 5
     nbins_dv: int = 101
+    experimental_likelihood: bool = False
+    experimental_wrap_binsize_meta: bool = False
+    experimental_include_incongruent_dv: bool = False
 
     true_params: Dict = None
     force_settings: bool = False
@@ -263,10 +287,16 @@ class Configuration(ReprMixin):
     _noise_meta_default: Parameter = Parameter(guess=0.2, bounds=(1e-5, 50), grid_range=np.arange(0.05, 1, 0.1))
     _noise_transform_meta_default: Parameter = Parameter(guess=0, bounds=(0, 10),
                                                          grid_range=np.arange(0, 1.1, 0.25))
-    _readout_term_meta_default: Parameter = Parameter(guess=0, bounds=(-1, 1), grid_range=np.arange(-0.2, 0.21, 0.1))
-    _slope_meta_default: Parameter = Parameter(guess=1, bounds=(0.1, 50), grid_range=np.arange(0.2, 1.71, 0.3))
-    _confidence_term_meta_default: Parameter = Parameter(guess=0, bounds=(-1, 1), grid_range=np.arange(-0.3, 0.31, 0.15))
-    _scaling_meta_default: Parameter = Parameter(guess=1, bounds=(0.1, 10), grid_range=np.arange(0.5, 2.01, 0.3))
+    _evidence_bias_mult_meta_default: Parameter = Parameter(guess=1, bounds=(0.1, 50),
+                                                            grid_range=np.arange(0.2, 1.71, 0.3))
+    _evidence_bias_add_meta_default: Parameter = Parameter(guess=0, bounds=(-1, 1),
+                                                           grid_range=np.arange(-0.2, 0.21, 0.1))
+    _evidence_bias_mult_postnoise_meta_default: Parameter = Parameter(guess=1, bounds=(0.1, 50),
+                                                                      grid_range=np.arange(0.2, 1.71, 0.3))
+    _confidence_bias_mult_meta_default: Parameter = Parameter(guess=1, bounds=(0.1, 10),
+                                                              grid_range=np.arange(0.5, 2.01, 0.3))
+    _confidence_bias_add_meta_default: Parameter = Parameter(guess=0, bounds=(-1, 1),
+                                                             grid_range=np.arange(-0.3, 0.31, 0.15))
     _criterion_meta_default: Parameter = Parameter(guess=0, bounds=(1e-6, 50),
                                                    grid_range=np.exp(np.linspace(0, np.log(2), 8)) - 0.9)
     _level_meta_default: Parameter = Parameter(guess=0, bounds=(1e-6, 1),
@@ -275,7 +305,8 @@ class Configuration(ReprMixin):
     def __post_init__(self):
 
         if self.meta_link_function == 'probability_correct_ideal':
-            self.enable_slope_meta = False
+            self.enable_evidence_bias_mult_meta = False
+            self.enable_evidence_bias_mult_postnoise_meta = False
 
         if self.gradient_free is None:
             if '_criteria' in self.meta_link_function or '_transform' in self.meta_noise_model:
@@ -289,8 +320,9 @@ class Configuration(ReprMixin):
             else:
                 self.slsqp_epsilon = _epsilon
 
-        if self._scaling_meta_default is None and (self.meta_noise_type == 'noisy_readout'):
-            self._scaling_meta_default = Parameter(guess=1, bounds=(0.1, 10), grid_range=np.arange(0.4, 1.01, 0.2))
+        if self._confidence_bias_mult_meta_default is None and (self.meta_noise_type == 'noisy_readout'):
+            self._confidence_bias_mult_meta_default = Parameter(guess=1, bounds=(0.1, 10),
+                                                                grid_range=np.arange(0.4, 1.01, 0.2))
 
         self._check_compatibility()
 
@@ -300,6 +332,7 @@ class Configuration(ReprMixin):
             self.print()
 
     def _check_compatibility(self):
+
         if self.enable_noise_transform_meta:
             text = 'Fitting signal-dependent metacognitive noise parameters leads to biased estimates (for currently ' \
                    'unknown reasons) and is thus discouraged.'
@@ -321,6 +354,11 @@ class Configuration(ReprMixin):
             raise ValueError('A criterion-based link function was set, but confidence criteria were not enabled.')
 
         if not self.settings_ignore_warnings:
+
+            if not self.enable_noise_meta:
+                warnings.warn(f'Setting enable_noise_meta=False was provided -> noise_meta is set to its default value '
+                              f'({self.noise_meta_default}). You may change this value via the configuration.')
+
             if self.enable_criteria_meta and '_criteria' not in self.meta_link_function:
                 self.enable_criteria_meta = 0
                 warnings.warn('Confidence criteria were enabled but no criterion-based link function was set -> '
@@ -335,20 +373,26 @@ class Configuration(ReprMixin):
                               f'enable_criteria_meta = {self.enable_levels_meta}')
 
             if self.meta_noise_type == 'noisy_readout':
-                if self.enable_confidence_term_meta:
-                    warnings.warn('The setting enable_confidence_term_meta has been enabled for a model of type '
+                if self.enable_confidence_bias_add_meta:
+                    warnings.warn('The setting enable_confidence_bias_add_meta has been enabled for a model of type '
                                   'noisy-readout. This setting results in a link function that is not monotonically '
                                   'increasing and likely leads to biased estimates.')
-                if self.enable_scaling_meta:
-                    warnings.warn('The setting enable_scaling_meta has been enabled for a model of type noisy-readout. '
-                                  'Use this only if you have strong reasons to belief that values of the confidence '
-                                  'scaling parameter are <= 1, since true values > 1 cannot be recovered for '
+                if self.enable_confidence_bias_mult_meta:
+                    warnings.warn('The setting enable_confidence_bias_mult_meta has been enabled for a model of type '
+                                  'noisy-readout. Use this only if you have strong reasons to belief that values of '
+                                  'this parameter are <= 1, since true values > 1 cannot be recovered for '
                                   'noisy-readout models.')
 
-            if self.enable_criteria_meta and self.enable_slope_meta:
-                self.enable_slope_meta = 0
-                warnings.warn('Confidence criteria were enabled, which is in conflict with enable_slope_meta > 0 -> '
-                              'auto-setting enable_slope_meta = 0.')
+            if self.enable_criteria_meta and self.enable_evidence_bias_mult_meta:
+                self.enable_evidence_bias_mult_meta = 0
+                warnings.warn('Confidence criteria were enabled, which is in conflict with '
+                              'enable_evidence_bias_mult_meta > 0 -> auto-setting enable_evidence_bias_mult_meta = 0.')
+
+            if self.enable_criteria_meta and self.enable_evidence_bias_mult_postnoise_meta:
+                self.enable_evidence_bias_mult_postnoise_meta = 0
+                warnings.warn('Confidence criteria were enabled, which is in conflict with '
+                              'enable_evidence_bias_mult_postnoise_meta > 0 -> auto-setting '
+                              'enable_evidence_bias_mult_postnoise_meta = 0.')
 
     def _prepare_params_sens(self):
         if self.paramset_sens is None:
@@ -383,7 +427,8 @@ class Configuration(ReprMixin):
                     self._noise_meta_default.bounds = (1e-5, 250)
 
             param_names_meta = []
-            params_meta = ('noise', 'noise_transform', 'readout_term', 'slope', 'confidence_term', 'scaling')
+            params_meta = ('noise', 'noise_transform', 'evidence_bias_mult', 'evidence_bias_add',
+                           'evidence_bias_mult_postnoise', 'confidence_bias_add', 'confidence_bias_mult')
             for param in params_meta:
                 if getattr(self, f'enable_{param}_meta'):
                     param_names_meta += [f'{param}_meta']
