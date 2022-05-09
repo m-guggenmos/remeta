@@ -99,8 +99,10 @@ class ReMeta:
             if isinstance(precomputed_parameters, dict):
                 if not np.all([p in precomputed_parameters for p in self.cfg.paramset_sens.names]):
                     raise ValueError('Set of precomputed sensory parameters is incomplete.')
-                self.model.fit.fit_sens = OptimizeResult(x=[precomputed_parameters[p] for p in
-                                                            self.cfg.paramset_sens.names])
+                self.model.fit.fit_sens = OptimizeResult(
+                    x=[precomputed_parameters[p] for p in self.cfg.paramset_sens.names],
+                    fun=self._negll_sens([precomputed_parameters[p] for p in self.cfg.paramset_sens.names])
+                )
             else:
                 if self.cfg.paramset_sens.nparams > 0:
                     self.cfg.paramset_sens.constraints = self.cfg.constraints_sens_callable(self)
@@ -124,12 +126,12 @@ class ReMeta:
 
                 else:
                     self.model.fit.fit_sens = OptimizeResult(x=None)
-                if isinstance(self.cfg.true_params, dict):
-                    if not np.all([p in self.cfg.true_params for p in self.cfg.paramset_sens.base_names]):
-                        raise ValueError('Set of provided true sensory parameters is incomplete.')
-                    psens_true = sum([[self.cfg.true_params[p]] if n == 1 else self.cfg.true_params[p] for n, p in
-                                      zip(self.cfg.paramset_sens.base_len, self.cfg.paramset_sens.base_names)], [])
-                    self.model.fit.fit_sens.negll_true = self._negll_sens(psens_true)
+            if isinstance(self.cfg.true_params, dict):
+                if not np.all([p in self.cfg.true_params for p in self.cfg.paramset_sens.base_names]):
+                    raise ValueError('Set of provided true sensory parameters is incomplete.')
+                psens_true = sum([[self.cfg.true_params[p]] if n == 1 else self.cfg.true_params[p] for n, p in
+                                  zip(self.cfg.paramset_sens.base_len, self.cfg.paramset_sens.base_names)], [])
+                self.model.fit.fit_sens.negll_true = self._negll_sens(psens_true)
 
             # call once again with final=True to save the model fit
             negll, params_sens, choiceprob, posterior, stimuli_final = \
@@ -156,8 +158,10 @@ class ReMeta:
                 if not np.all([p in precomputed_parameters for p in self.cfg.paramset_meta.names]):
                     raise ValueError('Set of precomputed metacognitive parameters is incomplete.')
                 self.model.params_meta = {p: precomputed_parameters[p] for p in self.cfg.paramset_meta.names}
-                self.model.fit.fit_meta = OptimizeResult(x=[precomputed_parameters[p] for p in
-                                                            self.cfg.paramset_meta.names])
+                self.model.fit.fit_meta = OptimizeResult(
+                    x=[precomputed_parameters[p] for p in self.cfg.paramset_meta.names],
+                    fun=self.fun_meta([precomputed_parameters[p] for p in self.cfg.paramset_meta.names])
+                )
                 fitinfo_meta = self.fun_meta(list(self.model.params_meta.values()), *args_meta, final=True)  # noqa
                 self.model.store_meta(*fitinfo_meta)
             else:
@@ -170,7 +174,8 @@ class ReMeta:
                             self.fun_meta, self.cfg.paramset_meta, args_meta, gradient_free=self.cfg.gradient_free,
                             gridsearch=self.cfg.gridsearch, grid_multiproc=self.cfg.grid_multiproc,
                             global_minimization=self.cfg.global_minimization,
-                            fine_gridsearch=self.cfg.fine_gridsearch, slsqp_epsilon=self.cfg.slsqp_epsilon,
+                            fine_gridsearch=self.cfg.fine_gridsearch,
+                            gradient_method=self.cfg.gradient_method, slsqp_epsilon=self.cfg.slsqp_epsilon,
                             verbose=verbose
                         )
                     else:
@@ -180,18 +185,18 @@ class ReMeta:
                 fitinfo_meta = self.fun_meta(self.model.fit.fit_meta.x, *args_meta, final=True)
                 self.model.store_meta(*fitinfo_meta)
 
-                if self.cfg.true_params is not None:
-                    params_true_meta = sum([[self.cfg.true_params[p]] if n == 1 else self.cfg.true_params[p] for n, p in
-                                            zip(self.cfg.paramset_meta.base_len, self.cfg.paramset_meta.base_names)],
-                                           [])
-                    self.model.fit.fit_meta.negll_true = self.fun_meta(params_true_meta)
+            if self.cfg.true_params is not None:
+                params_true_meta = sum([[self.cfg.true_params[p]] if n == 1 else self.cfg.true_params[p] for n, p in
+                                        zip(self.cfg.paramset_meta.base_len, self.cfg.paramset_meta.base_names)],
+                                       [])
+                self.model.fit.fit_meta.negll_true = self.fun_meta(params_true_meta)
 
-                self.model.report_fit_meta(verbose)
+            self.model.report_fit_meta(verbose)
 
             self.model.params = {**self.model.params_sens, **self.model.params_meta}
 
-            if not ignore_warnings:
-                print_warnings(w)
+            # if not ignore_warnings:
+            #     print_warnings(w)
 
     def summary(self, extended=False, generative=True, generative_nsamples=1000):
         """
@@ -359,11 +364,17 @@ class ReMeta:
             return noise_meta
 
         binsize = self.cfg.binsize_meta if mock_binsize is None else mock_binsize
+        if self.cfg.experimental_wrap_binsize_meta:
+            wrap_neg = binsize - np.abs(np.minimum(1, self.data.confidence_2d + binsize) - self.data.confidence_2d)  # noqa
+            wrap_pos = binsize - np.abs(np.maximum(0, self.data.confidence_2d - binsize) - self.data.confidence_2d)  # noqa
+            binsize_neg, binsize_pos = binsize + wrap_neg, binsize + wrap_pos
+        else:
+            binsize_neg, binsize_pos = binsize, binsize
         dv_meta_from_conf_lb = self._link_function_inv(
-            np.maximum(0, self.data.confidence_2d - binsize), self.cfg.meta_link_function, params_meta,
+            np.maximum(0, self.data.confidence_2d - binsize_neg), self.cfg.meta_link_function, params_meta,
             criteria_meta=criteria_meta, levels_meta=levels_meta)
         dv_meta_from_conf_ub = self._link_function_inv(
-            np.minimum(1, self.data.confidence_2d + binsize), self.cfg.meta_link_function, params_meta,
+            np.minimum(1, self.data.confidence_2d + binsize_pos), self.cfg.meta_link_function, params_meta,
             criteria_meta=criteria_meta, levels_meta=levels_meta)
         dv_meta_from_conf = self._link_function_inv(
             self.data.confidence_2d, self.cfg.meta_link_function, params_meta,
@@ -376,24 +387,27 @@ class ReMeta:
                 warnings.simplefilter('ignore', RuntimeWarning)
                 window = dist.cdf(dv_meta_from_conf_ub) - dist.cdf(dv_meta_from_conf_lb)
                 likelihood = (dv_meta_from_conf > 1e-8) * window + \
-                             (dv_meta_from_conf <= 1e-8) * dist.cdf(dv_meta_from_conf + binsize)
+                             (dv_meta_from_conf <= 1e-8) * dist.cdf(dv_meta_from_conf + binsize_pos)
             if final:
-                likelihood_pdf = (dv_meta_from_conf > 1e-8) * dist.pdf(dv_meta_from_conf.astype(maxfloat)).astype(
-                    np.float64) + \
-                                 (dv_meta_from_conf <= 1e-8) * dist.cdf(dv_meta_from_conf + binsize)
+                likelihood_pdf = (dv_meta_from_conf > 1e-8) * \
+                                 dist.pdf(dv_meta_from_conf.astype(maxfloat)).astype(np.float64) + \
+                                (dv_meta_from_conf <= 1e-8) * \
+                                 dist.cdf(dv_meta_from_conf.astype(maxfloat) + binsize_pos).astype(np.float64)
         else:
             likelihood = dist.cdf(dv_meta_from_conf_ub) - dist.cdf(dv_meta_from_conf_lb)
             if final:
                 likelihood_pdf = dist.pdf(dv_meta_from_conf)
 
-        if not self.cfg.detection_model:
-            invalid = np.sign(self.model.dv_sens_considered) != np.sign(self.data.choices_2d - 0.5)
-            likelihood[invalid] = np.nan
-            self.model.dv_sens_pmf[invalid] = np.nan
+        if not self.cfg.detection_model and not self.cfg.experimental_include_incongruent_dv:
+            likelihood[self.model.dv_sens_considered_invalid] = np.nan
 
         # compute log likelihood
         likelihood_weighted_cum = np.nansum(self.model.dv_sens_pmf * likelihood, axis=1)
-        negll = -np.sum(np.log(np.maximum(likelihood_weighted_cum, self.cfg.min_likelihood_meta)))
+        if self.cfg.experimental_likelihood:
+            # use an upper bound for the negative log likelihood based on a uniform 'guessing' model
+            negll = min(self.model.max_negll, -np.sum(np.log(np.maximum(likelihood_weighted_cum, 1e-200))))
+        else:
+            negll = -np.sum(np.log(np.maximum(likelihood_weighted_cum, self.cfg.min_likelihood_meta)))
         negll *= punishment_factor
 
         if final:
@@ -447,7 +461,11 @@ class ReMeta:
 
         # compute weighted cumulative negative log likelihood
         likelihood_weighted_cum = np.nansum(likelihood * self.model.dv_sens_pmf, axis=1)
-        negll = -np.sum(np.log(np.maximum(likelihood_weighted_cum, self.cfg.min_likelihood_meta)))
+        if self.cfg.experimental_likelihood:
+            # use an upper bound for the negative log likelihood based on a uniform 'guessing' model
+            negll = min(self.model.max_negll, -np.sum(np.log(np.maximum(likelihood_weighted_cum, 1e-200))))
+        else:
+            negll = -np.sum(np.log(np.maximum(likelihood_weighted_cum, self.cfg.min_likelihood_meta)))
         negll *= punishment_factor
 
         if final:
@@ -504,25 +522,31 @@ class ReMeta:
                 noise_meta = np.minimum(0.5, noise_meta)
 
         binsize = self.cfg.binsize_meta if mock_binsize is None else mock_binsize
+        if self.cfg.experimental_wrap_binsize_meta:
+            wrap_neg = binsize - np.abs(np.minimum(1, self.data.confidence_2d + binsize) - self.data.confidence_2d)
+            wrap_pos = binsize - np.abs(np.maximum(0, self.data.confidence_2d - binsize) - self.data.confidence_2d)
+            binsize_neg, binsize_pos = binsize + wrap_neg, binsize + wrap_pos
+        else:
+            binsize_neg, binsize_pos = binsize, binsize
         dist = get_dist(self.cfg.meta_noise_model, mode=self.model.confidence, scale=noise_meta,
                         meta_noise_type='noisy_report', lookup_table=self.lookup_table)
         # compute the probability of the actual confidence ratings given the pred confidence
         if self.cfg.meta_noise_model.startswith('censored_'):
             if self.cfg.meta_noise_model.endswith('gumbel'):
-                binsize = np.array(binsize).astype(maxfloat)
+                binsize_neg, binsize_pos = np.array(binsize_neg).astype(maxfloat), np.array(binsize_pos).astype(maxfloat)
             with warnings.catch_warnings():
                 warnings.simplefilter('ignore', RuntimeWarning)
-                window = (dist.cdf(np.minimum(1, self.data.confidence_2d + binsize)) -
-                          dist.cdf(np.maximum(0, self.data.confidence_2d - binsize)))
+                window = (dist.cdf(np.minimum(1, self.data.confidence_2d + binsize_pos)) -
+                          dist.cdf(np.maximum(0, self.data.confidence_2d - binsize_neg)))
             likelihood = (((self.data.confidence_2d > 1e-8) & (self.data.confidence_2d < 1 - 1e-8)) * window +
-                          (self.data.confidence_2d <= 1e-8) * dist.cdf(binsize).astype(np.float64) +
-                          (self.data.confidence_2d >= 1 - 1e-8) * (1 - dist.cdf(1 - binsize))).astype(np.float64)
+                          (self.data.confidence_2d <= 1e-8) * dist.cdf(binsize_pos).astype(np.float64) +
+                          (self.data.confidence_2d >= 1 - 1e-8) * (1 - dist.cdf(1 - binsize_neg))).astype(np.float64)
             if final:
                 likelihood_pdf = \
                     (((self.data.confidence_2d > 1e-8) & (self.data.confidence_2d < 1 - 1e-8)) *
                         dist.pdf(self.data.confidence_2d.astype(maxfloat)) +
-                     (self.data.confidence_2d <= 1e-8) * dist.cdf(binsize) +
-                        (self.data.confidence_2d >= 1 - 1e-8) * (1 - dist.cdf(1 - binsize))).astype(np.float64)
+                     (self.data.confidence_2d <= 1e-8) * dist.cdf(binsize_pos) +
+                        (self.data.confidence_2d >= 1 - 1e-8) * (1 - dist.cdf(1 - binsize_neg))).astype(np.float64)
             else:
                 likelihood_pdf = None
         else:
@@ -530,18 +554,16 @@ class ReMeta:
                 # catch this warning, which doesn't make any sense (output is valid if this happens)
                 warnings.filterwarnings('ignore', category=RuntimeWarning, module='scipy.stats',
                                         message='divide by zero encountered in _beta_cdf')
-                likelihood = dist.cdf(np.minimum(1, self.data.confidence_2d + binsize)) - \
-                             dist.cdf(np.maximum(0, self.data.confidence_2d - binsize))  # noqa
+                likelihood = dist.cdf(np.minimum(1, self.data.confidence_2d + binsize_pos)) - \
+                             dist.cdf(np.maximum(0, self.data.confidence_2d - binsize_neg))  # noqa
             if final:
                 likelihood_pdf = dist.pdf(self.data.confidence_2d)
             else:
                 likelihood_pdf = None
 
-        if not self.cfg.detection_model:
-            invalid = np.sign(self.model.dv_sens_considered) != np.sign(self.data.choices_2d - 0.5)
-            likelihood[invalid] = np.nan
-            self.model.dv_sens_pmf[invalid] = np.nan
-            self.model.confidence[invalid] = np.nan
+        if not self.cfg.detection_model and not self.cfg.experimental_include_incongruent_dv:
+            likelihood[self.model.dv_sens_considered_invalid] = np.nan
+            self.model.confidence[self.model.dv_sens_considered_invalid] = np.nan
 
         return params_meta, noise_meta, self.model.confidence, dist, dv_meta_considered, likelihood, likelihood_pdf, \
                punishment_factor
@@ -679,8 +701,21 @@ class ReMeta:
                                                 logistic_neg.cdf(self.model.dv_sens_considered[cond_neg] - margin_neg))
             self.model.dv_sens_pmf[cond_pos] = (logistic_pos.cdf(self.model.dv_sens_considered[cond_pos] + margin_pos) -
                                                 logistic_pos.cdf(self.model.dv_sens_considered[cond_pos] - margin_pos))
-            #  normalize PMF
+            # normalize PMF
             self.model.dv_sens_pmf = self.model.dv_sens_pmf / self.model.dv_sens_pmf.sum(axis=1).reshape(-1, 1)
+            # invalidate invalid decision values
+            if not self.cfg.experimental_include_incongruent_dv:
+                self.model.dv_sens_considered_invalid = np.sign(self.model.dv_sens_considered) != \
+                                                        np.sign(self.data.choices_2d - 0.5)
+                self.model.dv_sens_pmf[self.model.dv_sens_considered_invalid] = np.nan
+
+            if self.cfg.experimental_likelihood:
+                # self.cfg.binsize_meta*2 is the probability for a given confidence rating assuming a uniform
+                # distribution for confidence. This 'confidence guessing model' serves as a upper bound for the
+                # negative log likelihood.
+                min_likelihood = self.cfg.binsize_meta*2*np.ones(self.model.dv_sens_pmf.shape)
+                min_likelihood_weighted_cum = np.nansum(min_likelihood * self.model.dv_sens_pmf, axis=1)
+                self.model.max_negll = -np.log(min_likelihood_weighted_cum).sum()
 
         self.model.dv_sens_considered_abs = np.abs(self.model.dv_sens_considered)
         self.model.dv_sens_mode = dv_sens_mode.flatten()
@@ -689,17 +724,23 @@ class ReMeta:
         """
         Compute metacognitive decision values
         """
-        if self.cfg.enable_readout_term_meta == 1:
-            dv_meta_considered = np.maximum(0, self.model.dv_sens_considered_abs + params_meta['readout_term_meta'])
-        elif self.cfg.enable_readout_term_meta == 2:
+        if self.cfg.enable_evidence_bias_mult_meta == 1:
+            dv_meta_considered = params_meta['evidence_bias_mult_meta'] * self.model.dv_sens_considered_abs
+        elif self.cfg.enable_evidence_bias_mult_meta == 2:
             dv_meta_considered = np.full(self.model.dv_sens_considered.shape, np.nan)
             neg, pos = self.model.dv_sens_considered < 0, self.model.dv_sens_considered >= 0
-            dv_meta_considered[neg] = np.maximum(0, self.model.dv_sens_considered_abs[neg] +
-                                                 params_meta['readout_term_meta'][0])
-            dv_meta_considered[pos] = np.maximum(0, self.model.dv_sens_considered_abs[pos] +
-                                                 params_meta['readout_term_meta'][1])
+            dv_meta_considered[neg] = params_meta['evidence_bias_mult_meta'][0] * self.model.dv_sens_considered_abs[neg]
+            dv_meta_considered[pos] = params_meta['evidence_bias_mult_meta'][1] * self.model.dv_sens_considered_abs[pos]
         else:
-            dv_meta_considered = np.maximum(0, self.model.dv_sens_considered_abs)
+            dv_meta_considered = self.model.dv_sens_considered_abs
+
+        if self.cfg.enable_evidence_bias_add_meta == 1:
+            dv_meta_considered = np.maximum(0, dv_meta_considered + params_meta['evidence_bias_add_meta'])
+        elif self.cfg.enable_evidence_bias_add_meta == 2:
+            dv_meta_considered = np.full(self.model.dv_sens_considered.shape, np.nan)
+            neg, pos = self.model.dv_sens_considered < 0, self.model.dv_sens_considered >= 0
+            dv_meta_considered[neg] = np.maximum(0, dv_meta_considered[neg] + params_meta['evidence_bias_add_meta'][0])
+            dv_meta_considered[pos] = np.maximum(0, dv_meta_considered[pos] + params_meta['evidence_bias_add_meta'][1])
         return dv_meta_considered
 
     def _prepare_criteria(self, params_meta):
