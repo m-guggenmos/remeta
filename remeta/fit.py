@@ -88,7 +88,7 @@ def grid_search(x0, fun, args, param_set, ll_grid, valid, n_grid_candidates, n_g
 
 def fmincon(fun, param_set, args, gridsearch=False, grid_multiproc=True,
             gradient_free=False, global_minimization=False, fine_gridsearch=False, verbose=True,
-            n_grid_candidates=10, n_grid_iter=3, slsqp_epsilon=_epsilon):
+            n_grid_candidates=10, n_grid_iter=3, gradient_method='slsqp', slsqp_epsilon=_epsilon):
 
     if verbose:
         negll_initial_guess = fun(param_set.guess, *args)
@@ -164,9 +164,24 @@ def fmincon(fun, param_set, args, gridsearch=False, grid_multiproc=True,
         else:
             if verbose:
                 print('Performing local optimization')
-            fit = minimize(fun, x0, bounds=bounds, args=tuple(args), constraints=param_set.constraints,
-                           method='slsqp', options=dict(eps=slsqp_epsilon))
-    fit.execution_time = timeit.default_timer() - t0
+            gradient_method = [gradient_method] if isinstance(gradient_method, str) else gradient_method
+            min_fun = np.inf
+            for method in gradient_method:
+                if method == 'slsqp':
+                    slsqp_epsilon_ = slsqp_epsilon if hasattr(slsqp_epsilon, '__len__') else [slsqp_epsilon]
+                    for eps in slsqp_epsilon_:
+                        fit_ = minimize(fun, x0, bounds=bounds, args=tuple(args), constraints=param_set.constraints,
+                                        method='slsqp', options=dict(eps=eps))
+                        if fit_.fun < min_fun:
+                            min_fun = fit_.fun
+                            fit = fit_
+                else:
+                    fit_ = minimize(fun, x0, bounds=bounds, args=tuple(args), constraints=param_set.constraints,
+                                    method=method)
+                    if fit_.fun < min_fun:
+                        min_fun = fit_.fun
+                        fit = fit_
+    fit.execution_time = timeit.default_timer() - t0  # noqa
 
     return fit
 
