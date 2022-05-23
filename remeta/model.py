@@ -41,6 +41,7 @@ class ReMeta:
             self.cfg = Configuration(**cfg_kwargs)
         else:
             self.cfg = cfg
+        self.cfg.setup()
 
         if self.cfg.meta_noise_model.startswith('truncated_') and self.cfg.meta_noise_model.endswith('_lookup'):
             self.lookup_table = np.load(f"lookup_{self.cfg.meta_noise_model}_{self.cfg.meta_noise_type}.npz")
@@ -56,7 +57,7 @@ class ReMeta:
         self.fun_meta = dict(noisy_report=self._negll_meta_noisyreport,
                              noisy_readout=self._negll_meta_noisyreadout)[self.cfg.meta_noise_type]
 
-    def fit(self, stimuli, choices, confidence, precomputed_parameters=None, verbose=True,
+    def fit(self, stimuli, choices, confidence, precomputed_parameters=None, guess_meta=None, verbose=True,
             ignore_warnings=False):
         """
         Fit sensory and metacognitive parameters
@@ -76,6 +77,8 @@ class ReMeta:
             Provide pre-computed parameters. A dictionary with all parameters defined by the model must be passed. This
             can sometimes be useful to obtain information from the model without having to fit the model.
             [ToDO: which information?]
+        guess_meta : array-like of shape (n_params_meta)
+            For testing: provide an initial guess for the optimization of the metacognitive level
         verbose : bool
             If True, information of the model fitting procedure is printed.
         ignore_warnings : bool
@@ -176,6 +179,8 @@ class ReMeta:
                             global_minimization=self.cfg.global_minimization,
                             fine_gridsearch=self.cfg.fine_gridsearch,
                             gradient_method=self.cfg.gradient_method, slsqp_epsilon=self.cfg.slsqp_epsilon,
+                            init_nelder_mead=self.cfg.init_nelder_mead,
+                            guess=guess_meta,
                             verbose=verbose
                         )
                     else:
