@@ -10,7 +10,8 @@ from .util import _check_param, TAB, type2roc
 
 class Simulation:
     def __init__(self, nsubjects, nsamples, params, cfg, stimulus_ids, stimuli, choices, dv_sens_prenoise, dv_sens,
-                 dv_meta_prenoise, dv_meta, confidence_prenoise, confidence, noise_meta, likelihood_dist=None):
+                 dv_meta_prenoise=None, dv_meta=None, confidence_prenoise=None, confidence=None, noise_meta=None,
+                 likelihood_dist=None):
         self.nsubjects = nsubjects
         self.nsamples = nsamples
         self.params = params
@@ -32,7 +33,8 @@ class Simulation:
 
     def squeeze(self):
         for var in ('stimulus_ids', 'stimuli', 'choices', 'correct', 'dv_sens', 'dv_meta', 'confidence'):
-            setattr(self, var, getattr(self, var).squeeze())
+            if getattr(self, var) is not None:
+                setattr(self, var, getattr(self, var).squeeze())
         return self
 
 
@@ -58,9 +60,9 @@ def simu_type1_responses(stimuli, params, cfg):
 
     dv_sens_prenoise = np.full(stimuli_final.shape, np.nan)
     dv_sens_prenoise[stimuli_final < 0] = (np.abs(stimuli_final[stimuli_final < 0]) > thresh_sens[0]) * \
-        stimuli_final[stimuli_final < 0] - bias_sens[0]
+        stimuli_final[stimuli_final < 0] + bias_sens[0]
     dv_sens_prenoise[stimuli_final >= 0] = (np.abs(stimuli_final[stimuli_final >= 0]) > thresh_sens[1]) * \
-        stimuli_final[stimuli_final >= 0] - bias_sens[1]
+        stimuli_final[stimuli_final >= 0] + bias_sens[1]
 
     if cfg.detection_model:
         nchannels = cfg.detection_model_nchannels  # number of sensory channels
@@ -88,10 +90,16 @@ def simu_type1_responses(stimuli, params, cfg):
 
 def simu_data(nsubjects, nsamples, params, cfg=None, stimuli_ext=None, verbose=True, stimuli_stepsize=0.02,
               squeeze=False, force_settings=True, **kwargs):
+    params = params.copy()  # this variable can be modifed, thus better to make a copy
     if cfg is None:
         # Set configuration attributes that match keyword arguments
         cfg_kwargs = {k: v for k, v in kwargs.items() if k in Configuration.__dict__}
         cfg = Configuration(force_settings=force_settings, **cfg_kwargs)
+        for setting in cfg.__dict__:
+            if setting.startswith('enable_'):
+                if setting.split('enable_')[1] not in params:
+                    setattr(cfg, setting, 0)
+    cfg.setup()
 
     if cfg.meta_noise_model is None:
         cfg.meta_noise_model = dict(noisy_report='beta', noisy_readout='gamma')[cfg.meta_noise_type]
@@ -119,23 +127,25 @@ def simu_data(nsubjects, nsamples, params, cfg=None, stimuli_ext=None, verbose=T
 
     if cfg.enable_criteria_meta:
         ncrit_meta = int(cfg.meta_link_function.split('_')[0])
-        if cfg.enable_criteria_meta == 2:
-            params['criteria_meta'] = [[params[f'criterion{i}_meta'][j] for i in range(ncrit_meta)] for j in range(2)]
-        else:
-            params['criteria_meta'] = [params[f'criterion{i}_meta'] for i in range(ncrit_meta)]
-        for i in range(ncrit_meta):
-            params.pop(f'criterion{i}_meta', None)
+        if 'criteria_meta' not in params:
+            if cfg.enable_criteria_meta == 2:
+                params['criteria_meta'] = [[params[f'criterion{i}_meta'][j] for i in range(ncrit_meta)] for j in range(2)]
+            else:
+                params['criteria_meta'] = [params[f'criterion{i}_meta'] for i in range(ncrit_meta)]
+            for i in range(ncrit_meta):
+                params.pop(f'criterion{i}_meta', None)
     else:
         for p_ in [p for p in params if p.startswith('criterion')]:
             params.pop(p_, None)
     if cfg.enable_levels_meta:
         ncrit_meta = int(cfg.meta_link_function.split('_')[0])
-        if cfg.enable_levels_meta == 2:
-            params['levels_meta'] = [[params[f'level{i}_meta'][j] for i in range(ncrit_meta)] for j in range(2)]
-        else:
-            params['levels_meta'] = [params[f'level{i}_meta'] for i in range(ncrit_meta)]
-        for i in range(ncrit_meta):
-            params.pop(f'level{i}_meta', None)
+        if 'levels_meta' not in params:
+            if cfg.enable_levels_meta == 2:
+                params['levels_meta'] = [[params[f'level{i}_meta'][j] for i in range(ncrit_meta)] for j in range(2)]
+            else:
+                params['levels_meta'] = [params[f'level{i}_meta'] for i in range(ncrit_meta)]
+            for i in range(ncrit_meta):
+                params.pop(f'level{i}_meta', None)
     else:
         for p_ in [p for p in params if p.startswith('level')]:
             params.pop(p_, None)
@@ -149,9 +159,7 @@ def simu_data(nsubjects, nsamples, params, cfg=None, stimuli_ext=None, verbose=T
     stimulus_ids = (np.sign(stimuli) > 0).astype(int)
     choices, stimuli_final, dv_sens_prenoise, dv_sens = simu_type1_responses(stimuli, params, cfg)
 
-    if cfg.meta_noise_type is None:
-        dv_meta_prenoise, dv_meta, confidence_prenoise, confidence, noise_meta = None, None, None, None, None
-    else:
+    if not cfg.skip_meta:
         if cfg.enable_evidence_bias_mult_meta == 1:
             dv_meta_prenoise = params['evidence_bias_mult_meta'] * np.abs(dv_sens)
         elif cfg.enable_evidence_bias_mult_meta == 2:
@@ -221,28 +229,33 @@ def simu_data(nsubjects, nsamples, params, cfg=None, stimuli_ext=None, verbose=T
         choices = choices.squeeze()
         dv_sens_prenoise = dv_sens_prenoise.squeeze()
         dv_sens = dv_sens.squeeze()
-        dv_meta_prenoise = dv_meta_prenoise.squeeze()
-        dv_meta = dv_meta.squeeze()
-        confidence_prenoise = confidence_prenoise.squeeze()
-        confidence = confidence.squeeze()
+        if not cfg.skip_meta:
+            dv_meta_prenoise = dv_meta_prenoise.squeeze()  # noqa
+            dv_meta = dv_meta.squeeze()  # noqa
+            confidence_prenoise = confidence_prenoise.squeeze()  # noqa
+            confidence = confidence.squeeze()  # noqa
 
-    simulation = Simulation(
+    simargs = dict(
         nsubjects=nsubjects, nsamples=nsamples, params=params, cfg=cfg,
         stimulus_ids=stimulus_ids, stimuli=stimuli, choices=choices,
         dv_sens_prenoise=dv_sens_prenoise, dv_sens=dv_sens,
-        dv_meta_prenoise=dv_meta_prenoise, dv_meta=dv_meta,
-        confidence_prenoise=confidence_prenoise, confidence=confidence,
-        noise_meta=noise_meta  # noqa
     )
+    if not cfg.skip_meta:
+        simargs.update(
+            dv_meta_prenoise=dv_meta_prenoise, dv_meta=dv_meta, confidence_prenoise=confidence_prenoise,  # noqa
+            confidence=confidence, noise_meta=noise_meta  # noqa
+        )
+    simulation = Simulation(**simargs)
     if verbose:
         print('----------------------------------')
         print('Basic stats of the simulated data:')
         correct = (stimulus_ids == choices).astype(int)  # noqa
         print(f'{TAB}Performance: {100 * np.mean(correct):.1f}% correct')
-        print(f'{TAB}Confidence: {confidence.mean():.2f}')
         choice_bias = 100*choices.mean()
         print(f"{TAB}Choice bias: {('-', '+')[int(choice_bias > 50)]}{np.abs(choice_bias - 50):.1f}%")
-        print(f'{TAB}AUROC2: {type2roc(correct, confidence):.2f}')
+        if not cfg.skip_meta:
+            print(f'{TAB}Confidence: {confidence.mean():.2f}')
+            print(f'{TAB}AUROC2: {type2roc(correct, confidence):.2f}')
         print('----------------------------------')
 
     return simulation
