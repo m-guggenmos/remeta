@@ -154,24 +154,27 @@ def noise_sens_transform(stimuli, noise_sens=None, noise_transform_sens=None, th
     return noise_sens_transformed
 
 
-def _noise_sens_transform_pc(stimuli, dv_sens, slope_meta=None, noise_sens=None, noise_transform_sens=None,
-                             function_noise_transform_sens='multiplicative', **kwargs):  # noqa
+def _noise_sens_transform_pc(stimuli, dv_sens, evidence_bias_mult_postnoise_meta=None, noise_sens=None,
+                             noise_transform_sens=None, function_noise_transform_sens='multiplicative', **kwargs):  # noqa
     """
     Signal-dependent sensory noise transformation.
     Helper function for the signal-dependent sensory noise transformation under a probability-correct (pc) link
-    function. In this case, sensory noise might be subject to a metacognitive bias defined by slope_meta.
+    function. In this case, sensory noise might be subject to a multiplicative metacognitive bias defined by
+    evidence_bias_mult_postnoise_meta.
     """
     noise_sens_ = _check_param(noise_sens)
-    slope_meta_ = _check_param(slope_meta)
+    evidence_bias_mult_postnoise_meta_ = _check_param(evidence_bias_mult_postnoise_meta)
     noise_sens_transformed = np.full(dv_sens.shape, np.nan)
     if (len(dv_sens.shape) > len(stimuli.shape)) or (stimuli.shape[-1] == 1):
         stimuli = np.tile(stimuli, dv_sens.shape[-1])
 
-    noise_sens_neg = [noise_sens_[0] / slope_meta_[0], noise_sens_[1] / slope_meta_[0]]
+    noise_sens_neg = [noise_sens_[0] / evidence_bias_mult_postnoise_meta_[0],
+                      noise_sens_[1] / evidence_bias_mult_postnoise_meta_[0]]
     noise_sens_transformed[(dv_sens < 0)] = \
         noise_sens_transform(stimuli[dv_sens < 0], noise_sens_neg, noise_transform_sens=noise_transform_sens,
                              function_noise_transform_sens=function_noise_transform_sens)
-    noise_sens_pos = [noise_sens_[0] / slope_meta_[1], noise_sens_[1] / slope_meta_[1]]
+    noise_sens_pos = [noise_sens_[0] / evidence_bias_mult_postnoise_meta_[1],
+                      noise_sens_[1] / evidence_bias_mult_postnoise_meta_[1]]
     noise_sens_transformed[(dv_sens >= 0)] = \
         noise_sens_transform(stimuli[dv_sens >= 0], noise_sens_pos, noise_transform_sens=noise_transform_sens,
                              function_noise_transform_sens=function_noise_transform_sens)
@@ -250,7 +253,8 @@ def noise_meta_transform(confidence_or_dv_meta, dv_sens=None, noise_meta=None, n
     return noise_meta_transformed
 
 
-def link_function(dv_meta, link_fun, slope_meta=1, confidence_term_meta=0, scaling_meta=1, criteria_meta=None, levels_meta=None,
+def link_function(dv_meta, link_fun, evidence_bias_mult_postnoise_meta=1, confidence_bias_mult_meta=1,
+                  confidence_bias_add_meta=0, criteria_meta=None, levels_meta=None,
                   noise_sens=None, noise_transform_sens=None, function_noise_transform_sens='linear',
                   dv_sens=None, stimuli=None, constraint_mode=False, nchannels=10,
                   **kwargs):  # noqa
@@ -266,13 +270,13 @@ def link_function(dv_meta, link_fun, slope_meta=1, confidence_term_meta=0, scali
         Possible values: 'probability_correct', 'tanh', 'normcdf', 'erf', 'alg', 'guder', 'linear', 'identity',
                          'detection_model_linear', 'detection_model_mean', 'detection_model_mode',
                          'detection_model_full', 'detection_model_ideal'
-                         '{x}_criteria', '{x}_criteria_linear', '{x}_criteria_linear_tanh', '{x}_criteria_variable'
-    slope_meta : float or array-like
-        Confidence slope parameter.
-    confidence_term_meta : float or array-like
-        Confidence term parameter.
-    scaling_meta : float or array-like
-        Confidence scaling parameter.
+                         '{x}_criteria', '{x}_criteria_linear', '{x}_criteria_linear_tanh'
+    evidence_bias_mult_postnoise_meta : float or array-like
+        Multiplicative metacognitive bias parameter loading on evidence, but after application of readout noise.
+    confidence_bias_mult_meta : float or array-like
+        Multiplicative metacognitive bias parameter loading on confidence.
+    confidence_bias_add_meta : float or array-like
+        Additive metacognitive bias parameter loading on confidence.
     criteria_meta : array-like
         Confidence criteria in case of a criterion-based link function.
     levels_meta : array-like
@@ -302,15 +306,16 @@ def link_function(dv_meta, link_fun, slope_meta=1, confidence_term_meta=0, scali
     """
     dv_meta = np.atleast_1d(dv_meta)
     if dv_sens is None:
-        if hasattr(slope_meta, '__len__') or hasattr(confidence_term_meta, '__len__') or \
-                hasattr(scaling_meta, '__len__'):
-            raise ValueError('Parameters slope_meta, confidence_term_meta or scaling_meta appear to be sign-dependent '
-                             '(they have been passed as array-like), but dv_sens has not been provided.')
+        if hasattr(evidence_bias_mult_postnoise_meta, '__len__') or hasattr(confidence_bias_add_meta, '__len__') or \
+                hasattr(confidence_bias_mult_meta, '__len__'):
+            raise ValueError('Parameters evidence_bias_mult_postnoise_meta, confidence_bias_add_meta or '
+                             'confidence_bias_mult_meta appear to be sign-dependent (they have been passed as '
+                             'array-like), but dv_sens has not been provided.')
         else:
             dv_sens = dv_meta
-    confidence_term_meta_ = _check_param(confidence_term_meta)
-    slope_meta_ = _check_param(slope_meta)
-    scaling_meta_ = _check_param(scaling_meta)
+    evidence_bias_mult_postnoise_meta_ = _check_param(evidence_bias_mult_postnoise_meta)
+    confidence_bias_mult_meta_ = _check_param(confidence_bias_mult_meta)
+    confidence_bias_add_meta_ = _check_param(confidence_bias_add_meta)
     if criteria_meta is not None:
         criteria_meta_ = _check_criteria(criteria_meta)
     if levels_meta is not None:
@@ -318,7 +323,7 @@ def link_function(dv_meta, link_fun, slope_meta=1, confidence_term_meta=0, scali
     else:
         levels_meta_ = None
     if link_fun.startswith('detection_model') and link_fun.endswith('_scaled'):
-        dv_meta = np.minimum(nchannels, slope_meta * dv_meta)
+        dv_meta = np.minimum(nchannels, evidence_bias_mult_postnoise_meta * dv_meta)
 
     if link_fun in ['tanh', 'normcdf', 'erf', 'alg', 'guder', 'linear', 'identity']:
         lf = dict(
@@ -342,7 +347,7 @@ def link_function(dv_meta, link_fun, slope_meta=1, confidence_term_meta=0, scali
             (xsign >= 0) * np.minimum(1, slope[1] * np.abs(x)),
             identity=lambda x, xsign, slope: np.abs(x)
         )[link_fun]
-        confidence_pred = lf(dv_meta, dv_sens, slope_meta_)
+        confidence_pred = lf(dv_meta, dv_sens, evidence_bias_mult_postnoise_meta_)
     elif link_fun == 'probability_correct':
         if stimuli is None:
             if noise_transform_sens is not None or hasattr(noise_sens, '__len__'):
@@ -350,9 +355,11 @@ def link_function(dv_meta, link_fun, slope_meta=1, confidence_term_meta=0, scali
                                  'provided.')
             else:
                 stimuli = dv_sens
-        noise_sens = _noise_sens_transform_pc(stimuli, dv_sens, slope_meta=slope_meta_, noise_sens=noise_sens,
-                                              noise_transform_sens=noise_transform_sens,
-                                              noise_sens_function=function_noise_transform_sens)
+        noise_sens = _noise_sens_transform_pc(
+            stimuli, dv_sens, evidence_bias_mult_postnoise_meta=evidence_bias_mult_postnoise_meta_,
+            noise_sens=noise_sens, noise_transform_sens=noise_transform_sens,
+            noise_sens_function=function_noise_transform_sens
+        )
         confidence_pred = np.tanh(np.pi * dv_meta / (2 * np.sqrt(3) * noise_sens))
     elif 'crit' in link_fun:
         if 'linear_tanh' in link_fun:
@@ -476,14 +483,15 @@ def link_function(dv_meta, link_fun, slope_meta=1, confidence_term_meta=0, scali
     else:
         raise ValueError(f'{link_fun} is not a valid link function for the metacognitive type noisy-report')
 
-    confidence_pred[dv_sens < 0] = confidence_pred[dv_sens < 0] * scaling_meta_[0] + confidence_term_meta_[0]
-    confidence_pred[dv_sens >= 0] = confidence_pred[dv_sens >= 0] * scaling_meta_[1] + confidence_term_meta_[1]
+    confidence_pred[dv_sens < 0] = confidence_pred[dv_sens < 0] * confidence_bias_mult_meta_[0] + confidence_bias_add_meta_[0]
+    confidence_pred[dv_sens >= 0] = confidence_pred[dv_sens >= 0] * confidence_bias_mult_meta_[1] + confidence_bias_add_meta_[1]
     confidence_pred = np.maximum(0, np.minimum(1, confidence_pred))
 
     return confidence_pred
 
 
-def link_function_inv(confidence, link_fun, slope_meta=1, confidence_term_meta=0, scaling_meta=1, criteria_meta=None,
+def link_function_inv(confidence, link_fun, evidence_bias_mult_postnoise_meta=1, confidence_bias_mult_meta=1,
+                      confidence_bias_add_meta=0, criteria_meta=None,
                       levels_meta=None, noise_sens=None, noise_transform_sens=None,
                       function_noise_transform_sens='linear', dv_sens=None, stimuli=None,
                       **kwargs):  ## noqa
@@ -499,13 +507,13 @@ def link_function_inv(confidence, link_fun, slope_meta=1, confidence_term_meta=0
         Possible values: 'probability_correct', 'tanh', 'normcdf', 'erf', 'alg', 'guder', 'linear', 'identity',
                          'detection_model_linear', 'detection_model_mean', 'detection_model_mode',
                          'detection_model_full', 'detection_model_ideal'
-                         '{x}_criteria', '{x}_criteria_linear', '{x}_criteria_linear_tanh', '{x}_criteria_variable'
-    slope_meta : float or array-like
-        Confidence slope parameter.
-    confidence_term_meta : float or array-like
-        Confidence term parameter.
-    scaling_meta : float or array-like
-        Confidence scaling parameter.
+                         '{x}_criteria', '{x}_criteria_linear', '{x}_criteria_linear_tanh'
+    evidence_bias_mult_postnoise_meta : float or array-like
+        Multiplicative metacognitive bias parameter loading on evidence, but after application of readout noise.
+    confidence_bias_mult_meta : float or array-like
+        Multiplicative metacognitive bias parameter loading on confidence.
+    confidence_bias_add_meta : float or array-like
+        Additive metacognitive bias parameter loading on confidence.
     criteria_meta : array-like
         Confidence criteria in case of a criterion-based link function.
     levels_meta : array-like
@@ -530,20 +538,21 @@ def link_function_inv(confidence, link_fun, slope_meta=1, confidence_term_meta=0
         Absolute sensory decision values ('dv_meta').
     """
     if dv_sens is None:
-        if hasattr(slope_meta, '__len__') or hasattr(confidence_term_meta, '__len__') or \
-                hasattr(scaling_meta, '__len__'):
-            raise ValueError('Parameters slope_meta, confididence_term_meta or scaling_meta appear to be sign-dependent'
-                             ' (they have been passed as array-like), but dv_sens has not been provided.')
+        if hasattr(evidence_bias_mult_postnoise_meta, '__len__') or hasattr(confidence_bias_add_meta, '__len__') or \
+                hasattr(confidence_bias_mult_meta, '__len__'):
+            raise ValueError('Parameters evidence_bias_mult_postnoise_meta, confidence_bias_mult_meta or '
+                             'confidence_bias_add_meta appear to be sign-dependent (they have been passed as '
+                             'array-like), but dv_sens has not been provided.')
         else:
             dv_sens = confidence
     else:
         confidence = np.tile(confidence, dv_sens.shape[-1])
-    slope_meta_ = _check_param(slope_meta)
-    confidence_term_meta_ = _check_param(confidence_term_meta)
-    scaling_meta_ = _check_param(scaling_meta)
+    evidence_bias_mult_postnoise_meta_ = _check_param(evidence_bias_mult_postnoise_meta)
+    confidence_bias_add_meta_ = _check_param(confidence_bias_add_meta)
+    confidence_bias_mult_meta_ = _check_param(confidence_bias_mult_meta)
 
-    confidence[dv_sens < 0] = (confidence[dv_sens < 0] - confidence_term_meta_[0]) / scaling_meta_[0]
-    confidence[dv_sens >= 0] = (confidence[dv_sens >= 0] - confidence_term_meta_[1]) / scaling_meta_[1]
+    confidence[dv_sens < 0] = (confidence[dv_sens < 0] - confidence_bias_add_meta_[0]) / confidence_bias_mult_meta_[0]
+    confidence[dv_sens >= 0] = (confidence[dv_sens >= 0] - confidence_bias_add_meta_[1]) / confidence_bias_mult_meta_[1]
     confidence = np.minimum(1, confidence)
 
     if link_fun in ['tanh', 'erf', 'alg', 'guder', 'linear', 'logistic3']:
@@ -561,7 +570,7 @@ def link_function_inv(confidence, link_fun, slope_meta=1, confidence_term_meta=0
             linear=lambda x, xsign, slope: (xsign < 0) * (x / slope[0]) +
                                            (xsign >= 0) * (x / slope[1]),
         )[link_fun]
-        dv_meta = invlf(confidence, dv_sens, slope_meta_)
+        dv_meta = invlf(confidence, dv_sens, evidence_bias_mult_postnoise_meta_)
     else:
         if link_fun == 'probability_correct':
             confidence = np.minimum(1 - 1e-8, confidence)
@@ -571,7 +580,7 @@ def link_function_inv(confidence, link_fun, slope_meta=1, confidence_term_meta=0
                                      'provided.')
             else:
                 noise_sens = _noise_sens_transform_pc(
-                    stimuli, dv_sens, slope_meta=slope_meta_, noise_sens=noise_sens,
+                    stimuli, dv_sens, evidence_bias_mult_postnoise_meta=evidence_bias_mult_postnoise_meta_, noise_sens=noise_sens,
                     noise_transform_sens=noise_transform_sens,
                     function_noise_transform_sens=function_noise_transform_sens,
                 )
