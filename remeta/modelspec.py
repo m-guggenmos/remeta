@@ -171,19 +171,21 @@ class Model(ReprMixin):
         self.posterior = None
         self.dv_sens_considered = None
         self.dv_sens_considered_abs = None
+        self.dv_sens_considered_invalid = None
         self.dv_meta_considered = None
         self.dv_sens_mode = None
         self.dv_sens_pmf = None
         self.dv_sens_pmf_renorm = None
         self.dv_meta_mode = None
         self.confidence = None
+        self.nsamples = None
 
         self.likelihood_meta = None
         self.likelihood_meta_mode = None
         self.likelihood_meta_weighted_cum = None
         self.likelihood_meta_weighted_cum_renorm = None
+        self.max_negll = None
         self.noise_meta = None
-        self.nsamples_meta = None
 
         self.params = None
 
@@ -202,6 +204,7 @@ class Model(ReprMixin):
         self.choiceprob = choiceprob
         self.posterior = posterior
         self.fit.fit_sens.negll = negll
+        self.nsamples = len(self.stimuli_final)
         if not self.cfg.enable_noise_sens:
             self.params_sens['noise_sens'] = self.cfg.noise_sens_default
         self.params_sens_unnorm = {k: list(np.array(v) * stimulus_norm_coefficent) if hasattr(v, '__len__') else
@@ -227,50 +230,50 @@ class Model(ReprMixin):
         self.fit.fit_meta.negll_pdf = -np.sum(np.log(np.maximum(np.nansum(self.dv_sens_pmf *
                                                                           likelihood_pdf, axis=1), 1e-10)))
 
-        self.nsamples_meta = len(self.confidence)
-
     def report_fit_sens(self, verbose=True):
         if verbose:
             for k, v in self.params_sens.items():
                 true_string = '' if self.cfg.true_params is None else \
-                    (f" (true: [{', '.join([f'{p:.3f}' for p in self.cfg.true_params[k]])}])" if  # noqa
-                     hasattr(self.cfg.true_params[k], '__len__') else f' (true: {self.cfg.true_params[k]:.3f})')  # noqa
-                value_string = f"[{', '.join([f'{p:.3f}' for p in v])}]" if hasattr(v, '__len__') else f'{v:.3f}'
+                    (f" (true: [{', '.join([f'{p:.3g}' for p in self.cfg.true_params[k]])}])" if  # noqa
+                     hasattr(self.cfg.true_params[k], '__len__') else f' (true: {self.cfg.true_params[k]:.3g})')  # noqa
+                value_string = f"[{', '.join([f'{p:.3g}' for p in v])}]" if hasattr(v, '__len__') else f'{v:.3g}'
                 print(f'{TAB}[final] {k}: {value_string}{true_string}')
-            if hasattr(self.fit.fit_sens, 'execution_time'):
-                print(f'Final stats: {self.fit.fit_sens.execution_time:.2f} secs, {self.fit.fit_sens.nfev} fevs')
+            # if hasattr(self.fit.fit_sens, 'execution_time'):
+            #     print(f'Final stats: {self.fit.fit_sens.execution_time:.2g} secs, {self.fit.fit_sens.nfev} fevs')
             print(f'Final neg. LL: {self.fit.fit_sens.negll:.2f}')
             if self.cfg.true_params is not None and hasattr(self.fit.fit_sens, 'negll_true'):
                 print(f'Neg. LL using true params: {self.fit.fit_sens.negll_true:.2f}')
+            print(f"Total fitting time: {self.fit.fit_sens.execution_time:.2g} secs")
 
     def report_fit_meta(self, verbose=True):
         if self.cfg.true_params is not None:
             if 'criteria' in self.cfg.meta_link_function:
                 for i, k in enumerate(['', '_neg', '_pos']):
-                    if f'slope_or_criteria{k}_meta' in self.cfg.true_params:
-                        if '_variable' in self.cfg.meta_link_function:
+                    if f'criteria{k}_meta' in self.cfg.true_params:
+                        if self.cfg.enable_levels_meta:
                             self.cfg.true_params.update(
                                 {f"{'confidence_level' if np.mod(i, 2) else 'criterion'}_meta_{int(i / 2) + 1}{k}": v
                                  for i, v in
-                                 enumerate(self.cfg.true_params[f'slope_or_criteria{k}_meta'])})
+                                 enumerate(self.cfg.true_params[f'criteria{k}_meta'])})
                         else:
                             self.cfg.true_params.update({f"criterion_meta_{i + 1}{k}": v for i, v in
-                                                         enumerate(self.cfg.true_params[f'slope_or_criteria{k}_meta'])})
+                                                         enumerate(self.cfg.true_params[f'criteria{k}_meta'])})
 
         if verbose:
             for k, v in self.params_meta.items():
                 true_string = '' if self.cfg.true_params is None else \
-                    (f" (true: [{', '.join([f'{p:.3f}' for p in self.cfg.true_params[k]])}])" if
-                     hasattr(self.cfg.true_params[k], '__len__') else f' (true: {self.cfg.true_params[k]:.3f})')
-                value_string = f"[{', '.join([f'{p:.3f}' for p in v])}]" if hasattr(v, '__len__') else f'{v:.3f}'
+                    (f" (true: [{', '.join([f'{p:.3g}' for p in self.cfg.true_params[k]])}])" if
+                     hasattr(self.cfg.true_params[k], '__len__') else f' (true: {self.cfg.true_params[k]:.3g})')
+                value_string = f"[{', '.join([f'{p:.3g}' for p in v])}]" if hasattr(v, '__len__') else f'{v:.3g}'
                 print(f'{TAB}[final] {k}: {value_string}{true_string}')
-            if hasattr(self.fit.fit_meta, 'execution_time'):
-                print(f'Final stats: {self.fit.fit_meta.execution_time:.2f} secs, '
-                      f'{self.fit.fit_meta.nfev} fevs')
+            # if hasattr(self.fit.fit_meta, 'execution_time'):
+                # print(f'Final stats: {self.fit.fit_meta.execution_time:.2g} secs, '
+                #       f'{self.fit.fit_meta.nfev} fevs')
             print(f'Final neg. LL: {self.fit.fit_meta.negll:.2f}')
-        if self.cfg.true_params is not None:
-            if verbose:
-                print(f'Neg. LL using true params: {self.fit.fit_meta.negll_true:.2f}')
+            if self.cfg.true_params is not None:
+                if verbose:
+                    print(f'Neg. LL using true params: {self.fit.fit_meta.negll_true:.2f}')
+            print(f"Total fitting time: {self.fit.fit_meta.execution_time:.2g} secs")
 
     def summary(self, extended=False, fun_meta=None, confidence_gen=None, confidence_emp=None):
 
@@ -287,27 +290,53 @@ class Model(ReprMixin):
                     np.tanh(np.nanmean(np.arctanh(pearson2d(confidence_gen, confidence_tiled))))
                 self.fit.fit_meta.confidence_gen_spearman = \
                     np.tanh(np.nanmean(np.arctanh(
-                        spearman2d(confidence_gen, confidence_tiled, axis=1))))  # ToDo: what is this axis=1 doing here?
+                        spearman2d(confidence_gen, confidence_tiled, axis=1))))
                 self.fit.fit_meta.confidence_gen_mae = np.nanmean(np.abs(confidence_gen - confidence_emp))
                 self.fit.fit_meta.confidence_gen_medae = np.nanmedian(np.abs(confidence_gen - confidence_emp))
-            self.fit.fit_meta.negll_persample = self.fit.fit_meta.negll / self.nsamples_meta
-            self.fit.fit_meta.negll_mode = -np.nansum(np.log(np.maximum(self.likelihood_meta_mode, 1e-10)))
+            self.fit.fit_meta.negll_persample = self.fit.fit_meta.negll / self.nsamples
+            self.fit.fit_meta.negll_prenoise = -np.nansum(np.log(np.maximum(self.likelihood_meta_mode, 1e-10)))
             self.fit.negll = self.fit.fit_sens.negll + self.fit.fit_meta.negll
 
         desc = dict(
-            nsamples=self.nsamples_meta,
+            nsamples=self.nsamples,
             nparams_sens=self.cfg.paramset_sens.nparams,
             params_sens=self.params_sens,
+            evidence_sens=dict(
+                negll=self.fit.fit_sens.negll,
+                aic=2*self.cfg.paramset_sens.nparams + 2*self.fit.fit_sens.negll,
+                bic=2*np.log(self.nsamples) + 2*self.fit.fit_sens.negll
+            ),
+            params=self.params_sens,
             params_sens_unnorm=self.params_sens_unnorm,
             fit=self.fit
         )
+
+        if self.cfg.true_params is not None:
+            desc['evidence_sens'].update(
+                negll_true=self.fit.fit_sens.negll_true,
+                aic_true=2*self.cfg.paramset_sens.nparams + 2*self.fit.fit_sens.negll_true,
+                bic_true=2*np.log(self.nsamples) + 2*self.fit.fit_sens.negll_true
+            )
 
         if not self.cfg.skip_meta:
             desc.update(dict(
                 nparams_meta=self.cfg.paramset_meta.nparams,
                 params_meta=self.params_meta,
+                params={**self.params_sens, **self.params_meta},
                 nparams=self.cfg.paramset_sens.nparams + self.cfg.paramset_meta.nparams,
+                evidence_meta=dict(
+                    negll=self.fit.fit_meta.negll,
+                    aic=2*self.cfg.paramset_meta.nparams + 2*self.fit.fit_meta.negll,
+                    bic=2*np.log(self.nsamples) + 2*self.fit.fit_meta.negll
+                )
             ))
+            if self.cfg.true_params is not None:
+                desc['evidence_meta'].update(
+                    negll_true=self.fit.fit_meta.negll_true,
+                    aic_true=2*self.cfg.paramset_meta.nparams + 2*self.fit.fit_meta.negll_true,
+                    bic_true=2*np.log(self.nsamples) + 2*self.fit.fit_meta.negll_true
+                )
+
 
             if extended:
                 likelihood_01 = fun_meta(self.fit.fit_meta.x, mock_binsize=0.1)[1]
@@ -315,7 +344,7 @@ class Model(ReprMixin):
                 dict_extended = dict(
                     noise_meta=self.noise_meta,
                     likelihood=self.likelihood_meta,
-                    likelihood_mode=self.likelihood_meta_mode,
+                    likelihood_prenoise=self.likelihood_meta_mode,
                     likelihood_weighted_cum=self.likelihood_meta_weighted_cum,
                     likelihood_weighted_cum_renorm_01=np.nansum(likelihood_01 * self.dv_sens_pmf_renorm, axis=1),
                     likelihood_weighted_cum_renorm_025=np.nansum(likelihood_025 * self.dv_sens_pmf_renorm, axis=1),
