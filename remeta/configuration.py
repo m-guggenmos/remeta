@@ -7,6 +7,7 @@ from scipy.optimize.slsqp import _epsilon  # noqa
 
 from .modelspec import Parameter, ParameterSet
 from .util import ReprMixin
+from importlib.util import find_spec
 
 
 @dataclass
@@ -24,18 +25,23 @@ class Configuration(ReprMixin):
         Possible values: 'noisy_report', 'noisy_readout'
     meta_noise_model : str
         Metacognitive noise distribution.
-        Possible valus: 'norm', 'gumbel', 'lognorm', 'lognorm_varstd', 'beta', 'beta_std', 'betaprime', 'gamma',
-                        'censored_norm', 'censored_gumbel', 'censored_lognorm', 'censored_lognorm_varstd',
-                        'censored_betaprime', 'censored_gamma',
-                        'truncated_norm', 'truncated_norm_lookup', 'truncated_norm_fit',
-                        'truncated_gumbel', 'truncated_gumbel_lookup',
-                        'truncated_lognorm', 'truncated_lognorm_varstd'
+        Possible valus: 'truncated_norm', 'truncated_gumbel', 'truncated_lognorm',
+                        'norm', 'gumbel', 'lognorm', 'beta', 'gamma',
+                        'censored_norm', 'censored_gumbel', 'censored_lognorm', 'censored_gamma'
+                        Experimental (for internal use only):
+                        'beta_std', 'betaprime', 'lognorm_varstd',
+                        'censored_lognorm', 'censored_lognorm_varstd', 'censored_betaprime',
+                        'truncated_norm_lookup', 'truncated_norm_fit', 'truncated_gumbel_lookup',
+                        'truncated_lognorm_varstd'
     meta_link_function : str
         Metacognitive link function. In case of criterion-based link functions {x} refers to the number of criteria.
         Possible values: 'probability_correct', 'identity', 'tanh', 'normcdf', 'erf', 'alg', 'guder', 'linear',
+                         '{x}_criteria', '{x}_criteria_linear', '{x}_criteria_linear_tanh'
+                         Note: replace {x} with the number of criteria
+                         Experimental (for internal use only):
                          'detection_model_linear', 'detection_model_mean', 'detection_model_mode',
                          'detection_model_full', 'detection_model_ideal'
-                         '{x}_criteria', '{x}_criteria_linear', '{x}_criteria_linear_tanh', '{x}_criteria_variable'
+
     detection_model : bool
         Experimental. Define the model as a detection model.
     detection_model_nchannels : int
@@ -160,6 +166,8 @@ class Configuration(ReprMixin):
     slsqp_epsilon : float or Tuple/List (default: None)
         Set parameter epsilon parameter for the SLSQP optimization method.
         If provided as Tuple/List, test different eps parameters and take the best
+    init_nelder_mead : bool (default: False)
+        If True, jump-start parameter minimization with the gradient-free Nelder-Mead algorithm
 
     *** Transformation functions ***
     function_warping_sens: str (default: 'power')
@@ -214,18 +222,19 @@ class Configuration(ReprMixin):
 
     enable_warping_sens: int = 0
     enable_noise_sens: int = 1
-    enable_noise_transform_sens: int = 0
     enable_thresh_sens: int = 0
     enable_bias_sens: int = 1
     enable_noise_meta: int = 1
-    enable_noise_transform_meta: int = 0
     enable_evidence_bias_mult_meta: int = 1
     enable_evidence_bias_add_meta: int = 1
-    enable_evidence_bias_mult_postnoise_meta: int = 0
     enable_confidence_bias_mult_meta: int = 0
     enable_confidence_bias_add_meta: int = 0
     enable_criteria_meta: int = 0
     enable_levels_meta: int = 0
+    # Experimental:
+    enable_noise_transform_sens: int = 0
+    enable_noise_transform_meta: int = 0
+    enable_evidence_bias_mult_postnoise_meta: int = 0
 
     paramset_sens: ParameterSet = None
     paramset_meta: ParameterSet = None
@@ -257,6 +266,7 @@ class Configuration(ReprMixin):
     gradient_method: str = 'slsqp'
     gradient_free: bool = None
     slsqp_epsilon: float = None
+    init_nelder_mead: bool = False
 
     normalize_stimuli_by_max: bool = True
     confidence_bounds_error: float = 0
@@ -302,11 +312,7 @@ class Configuration(ReprMixin):
     _level_meta_default: Parameter = Parameter(guess=0, bounds=(1e-6, 1),
                                                grid_range=np.exp(np.linspace(0, np.log(2), 8)) - 0.9)
 
-    def __post_init__(self):
-
-        if self.meta_link_function == 'probability_correct_ideal':
-            self.enable_evidence_bias_mult_meta = False
-            self.enable_evidence_bias_mult_postnoise_meta = False
+    def setup(self):
 
         if self.gradient_free is None:
             if '_criteria' in self.meta_link_function or '_transform' in self.meta_noise_model:
@@ -323,6 +329,10 @@ class Configuration(ReprMixin):
         if self._confidence_bias_mult_meta_default is None and (self.meta_noise_type == 'noisy_readout'):
             self._confidence_bias_mult_meta_default = Parameter(guess=1, bounds=(0.1, 10),
                                                                 grid_range=np.arange(0.4, 1.01, 0.2))
+
+        if find_spec('multiprocessing_on_dill') is None:
+            warnings.warn(f'Multiprocessing on dill is not installed. Setting grid_multiproc is changed to False.')
+            self.grid_multiproc = False
 
         self._check_compatibility()
 
@@ -428,7 +438,7 @@ class Configuration(ReprMixin):
 
             param_names_meta = []
             params_meta = ('noise', 'noise_transform', 'evidence_bias_mult', 'evidence_bias_add',
-                           'evidence_bias_mult_postnoise', 'confidence_bias_add', 'confidence_bias_mult')
+                           'evidence_bias_mult_postnoise', 'confidence_bias_mult', 'confidence_bias_add')
             for param in params_meta:
                 if getattr(self, f'enable_{param}_meta'):
                     param_names_meta += [f'{param}_meta']
@@ -496,8 +506,8 @@ def _constraints_meta_default(remeta):
     # Note that metacognitive noise is based on confidence in case of the noisy-report model and
     # on metacognitive decision values in case of the noisy-readout model
     if remeta.cfg.enable_noise_transform_meta:
-        constraints += [{'type': 'ineq', 'fun': lambda x: np.min(remeta.fun_meta(x, return_noise=True,
-                                                                                 constraint_mode=True)) - 0.001}]
+        constraints += [{'type': 'ineq', 'fun': lambda x: np.min(remeta.fun_meta_helper(x, return_noise=True,
+                                                                                        constraint_mode=True)) - 0.001}]
 
     if '_criteria' in remeta.cfg.meta_link_function:
         ncrit_meta = int(remeta.cfg.meta_link_function.split('_')[0])
@@ -505,25 +515,25 @@ def _constraints_meta_default(remeta):
         ncrit_meta_ = ncrit_meta - 1 if 'linear_tanh' in remeta.cfg.meta_link_function else ncrit_meta
         if remeta.cfg.enable_criteria_meta == 2:
             def fun_criteria(x):
-                crit = remeta.fun_meta(x, return_criteria=True, constraint_mode=True)
+                crit = remeta.fun_meta_helper(x, return_criteria=True, constraint_mode=True)
                 return np.sum([(crit[0][i] > (0 if i == 0 else crit[0][i - 1])) for i in range(ncrit_meta_)]) + \
                     np.sum([(crit[1][i] > (0 if i == 0 else crit[1][i - 1])) for i in range(ncrit_meta_)]) - \
                     2 * ncrit_meta_
         else:
             def fun_criteria(x):
-                crit = remeta.fun_meta(x, return_criteria=True, constraint_mode=True)
+                crit = remeta.fun_meta_helper(x, return_criteria=True, constraint_mode=True)
                 return np.sum([(crit[i] > (0 if i == 0 else crit[i - 1])) for i in range(ncrit_meta_)]) - ncrit_meta_
         constraints += [{'type': 'eq', 'fun': fun_criteria}]
         if remeta.cfg.enable_levels_meta:
             if remeta.cfg.enable_levels_meta == 2:
                 def fun_levels(x):
-                    lev = remeta.fun_meta(x, return_levels=True, constraint_mode=True)
+                    lev = remeta.fun_meta_helper(x, return_levels=True, constraint_mode=True)
                     return np.sum([(lev[0][i] > (0 if i == 0 else lev[0][i - 1])) for i in range(ncrit_meta)]) + \
                         np.sum([(lev[1][i] > (0 if i == 0 else lev[1][i - 1])) for i in range(ncrit_meta)]) - \
                         2 * ncrit_meta
             else:
                 def fun_levels(x):
-                    lev = remeta.fun_meta(x, return_levels=True, constraint_mode=True)
+                    lev = remeta.fun_meta_helper(x, return_levels=True, constraint_mode=True)
                     return np.sum([(lev[i] > (0 if i == 0 else lev[i - 1])) for i in range(ncrit_meta)]) - ncrit_meta
             constraints += [{'type': 'eq', 'fun': fun_levels}]
     return constraints
