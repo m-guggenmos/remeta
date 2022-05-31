@@ -1,6 +1,7 @@
 import os
 import pathlib
 import pickle
+import timeit
 import warnings
 from dataclasses import make_dataclass
 
@@ -16,6 +17,7 @@ from .modelspec import Model, Data
 from .transform import warp, noise_meta_transform, noise_sens_transform, logistic, link_function, link_function_inv
 from .util import print_warnings, _check_param, TAB
 from .util import maxfloat
+from .plot import plot_link_function, plot_confidence_dist
 
 np.set_printoptions(suppress=True)
 
@@ -53,9 +55,14 @@ class ReMeta:
 
         self._punish_message = False
 
+        self.sens_is_fitted = False
+        self.meta_is_fitted = False
+
         # Define the function that is minimized for metacognitive parameter fitting
         self.fun_meta = dict(noisy_report=self._negll_meta_noisyreport,
                              noisy_readout=self._negll_meta_noisyreadout)[self.cfg.meta_noise_type]
+        self.fun_meta_helper = dict(noisy_report=self._helper_negll_meta_noisyreport,
+                                    noisy_readout=self._helper_negll_meta_noisyreadout)[self.cfg.meta_noise_type]
 
     def fit(self, stimuli, choices, confidence, precomputed_parameters=None, guess_meta=None, verbose=True,
             ignore_warnings=False):
@@ -111,10 +118,11 @@ class ReMeta:
                     self.cfg.paramset_sens.constraints = self.cfg.constraints_sens_callable(self)
                     if verbose:
                         negll_initial_guess = self._negll_sens(self.cfg.paramset_sens.guess)
-                        print(f'Initial neg. LL: {negll_initial_guess:.2f}')
+                        print(f'Initial guess (neg. LL: {negll_initial_guess:.2f})')
                         for i, p in enumerate(self.cfg.paramset_sens.names):
-                            print(f'{TAB}[initial] {p}: {self.cfg.paramset_sens.guess[i]:.4g}')
+                            print(f'{TAB}[guess] {p}: {self.cfg.paramset_sens.guess[i]:.4g}')
                         print('Performing local optimization')
+                    t0 = timeit.default_timer()
                     self.model.fit.fit_sens = minimize(
                         self._negll_sens, self.cfg.paramset_sens.guess, bounds=self.cfg.paramset_sens.bounds,
                         constraints=self.cfg.paramset_sens.constraints, method='trust-constr'
@@ -126,6 +134,7 @@ class ReMeta:
                         )
                         if fit_powell.fun < self.model.fit.fit_sens.fun:
                             self.model.fit.fit_sens = fit_powell
+                    self.model.fit.fit_sens.execution_time = timeit.default_timer() - t0
 
                 else:
                     self.model.fit.fit_sens = OptimizeResult(x=None)
@@ -140,10 +149,12 @@ class ReMeta:
             negll, params_sens, choiceprob, posterior, stimuli_final = \
                 self._negll_sens(self.model.fit.fit_sens.x, final=True)
             if 'thresh_sens' in params_sens and params_sens['thresh_sens'] < self.data.stimuli_min:
-                params_sens['thresh_sens'] = 0
+                warnings.warn('Fitted threshold is below the minimal stimulus intensity; consider disabling '
+                              'the sensory threshold by setting enable_thresh_sens to 0', category=UserWarning)
             self.model.store_sens(negll, params_sens, choiceprob, posterior, stimuli_final,
                                   stimulus_norm_coefficent=self.data.stimuli_unnorm_max)
             self.model.report_fit_sens(verbose)
+            self.sens_is_fitted = True
 
         # if not ignore_warnings and verbose:
         #     print_warnings(w)
@@ -199,6 +210,8 @@ class ReMeta:
             self.model.report_fit_meta(verbose)
 
             self.model.params = {**self.model.params_sens, **self.model.params_meta}
+
+            self.meta_is_fitted = True
 
             # if not ignore_warnings:
             #     print_warnings(w)
@@ -285,8 +298,8 @@ class ReMeta:
         #                   (stimuli_final[cond_neg] - np.sign(stimuli_final[cond_neg]) * thresh_sens[0]) - bias_sens[0]
         # dv_sens[cond_pos] = (np.abs(stimuli_final[cond_pos]) > thresh_sens[1]) * \
         #                   (stimuli_final[cond_pos] - np.sign(stimuli_final[cond_pos]) * thresh_sens[1]) - bias_sens[1]
-        dv_sens[cond_neg] = (np.abs(stimuli_final[cond_neg]) > thresh_sens[0]) * stimuli_final[cond_neg] - bias_sens[0]
-        dv_sens[cond_pos] = (np.abs(stimuli_final[cond_pos]) > thresh_sens[1]) * stimuli_final[cond_pos] - bias_sens[1]
+        dv_sens[cond_neg] = (np.abs(stimuli_final[cond_neg]) > thresh_sens[0]) * stimuli_final[cond_neg] + bias_sens[0]
+        dv_sens[cond_pos] = (np.abs(stimuli_final[cond_pos]) > thresh_sens[1]) * stimuli_final[cond_pos] + bias_sens[1]
 
         noise_sens = self._noise_sens_transform(stimuli_final, params_sens)
         if return_noise:
@@ -307,7 +320,65 @@ class ReMeta:
 
     def _negll_meta_noisyreadout(self, params, ignore_warnings=False, mock_binsize=None, final=False,
                                  return_noise=False, return_criteria=False, return_levels=False,
-                                 constraint_mode=False):  # noqa
+                                 constraint_mode=False):
+        """
+        Minimization function for the noisy-report model
+
+        Parameters:
+        -----------
+        params : array-like of shape (nparams)
+            Parameter array of the metacognitive level.
+        ignore_warnings : bool
+            If True, suppress warnings during minimization.
+        mock_binsize : float
+            Binsize around empirical confidence ratings to evaluate the likelihood. If not None, also returns the
+            likelihood variable.
+        final : bool
+            If True, return latent variables and parameters.
+        return_noise : bool
+            If True, only return the metacognitive noise array (auxiliarly option to define constraints on the noise
+            array).
+        return_criteria : bool
+            If True, only return confidence criteria (auxiliarly option to define constraints on confidence criteria).
+        return_levels : bool
+            If True, only return confidence levels (auxiliarly option to define constraints on confidence levels).
+        constraint_mode : bool
+            If True, method runs during scipy optimize constraint testing.
+
+        Returns:
+        --------
+        By default, the method returns the negative log likelihood. However, depending on the arguments various
+        combinations of variables are returned (see Parameters).
+        negll: float
+            Negative (summed) log likelihood.
+        """
+
+        params_meta, noise_meta, dist, dv_meta_considered, likelihood, likelihood_pdf, criteria_meta, levels_meta, punishment_factor = \
+            self._helper_negll_meta_noisyreadout(params, ignore_warnings, mock_binsize, final, return_noise,
+                                                 return_criteria, return_levels, constraint_mode)
+
+        # compute log likelihood
+        likelihood_weighted_cum = np.nansum(self.model.dv_sens_pmf * likelihood, axis=1)
+        if self.cfg.experimental_likelihood:
+            # use an upper bound for the negative log likelihood based on a uniform 'guessing' model
+            negll = min(self.model.max_negll, -np.sum(np.log(np.maximum(likelihood_weighted_cum, 1e-200))))
+        else:
+            negll = -np.sum(np.log(np.maximum(likelihood_weighted_cum, self.cfg.min_likelihood_meta)))
+        negll *= punishment_factor
+
+        if final:
+            self.model.confidence = self._link_function(dv_meta_considered, params_meta,
+                                                        criteria_meta=criteria_meta, levels_meta=levels_meta)
+            return negll, params_meta, noise_meta, likelihood, dv_meta_considered, likelihood_weighted_cum, \
+                   likelihood_pdf  # noqa
+        elif mock_binsize is not None:
+            return negll, likelihood
+        else:
+            return negll
+
+    def _helper_negll_meta_noisyreadout(self, params, ignore_warnings=False, mock_binsize=None, final=False,
+                                        return_noise=False, return_criteria=False, return_levels=False,
+                                        constraint_mode=False):  # noqa
         """
         Minimization function for the noisy-readout model
 
@@ -398,32 +469,20 @@ class ReMeta:
                                  dist.pdf(dv_meta_from_conf.astype(maxfloat)).astype(np.float64) + \
                                 (dv_meta_from_conf <= 1e-8) * \
                                  dist.cdf(dv_meta_from_conf.astype(maxfloat) + binsize_pos).astype(np.float64)
+            else:
+                likelihood_pdf = None
         else:
             likelihood = dist.cdf(dv_meta_from_conf_ub) - dist.cdf(dv_meta_from_conf_lb)
             if final:
                 likelihood_pdf = dist.pdf(dv_meta_from_conf)
+            else:
+                likelihood_pdf = None
 
         if not self.cfg.detection_model and not self.cfg.experimental_include_incongruent_dv:
             likelihood[self.model.dv_sens_considered_invalid] = np.nan
 
-        # compute log likelihood
-        likelihood_weighted_cum = np.nansum(self.model.dv_sens_pmf * likelihood, axis=1)
-        if self.cfg.experimental_likelihood:
-            # use an upper bound for the negative log likelihood based on a uniform 'guessing' model
-            negll = min(self.model.max_negll, -np.sum(np.log(np.maximum(likelihood_weighted_cum, 1e-200))))
-        else:
-            negll = -np.sum(np.log(np.maximum(likelihood_weighted_cum, self.cfg.min_likelihood_meta)))
-        negll *= punishment_factor
-
-        if final:
-            self.model.confidence = self._link_function(dv_meta_considered, params_meta,
-                                                        criteria_meta=criteria_meta, levels_meta=levels_meta)
-            return negll, params_meta, noise_meta, likelihood, dv_meta_considered, likelihood_weighted_cum, \
-                   likelihood_pdf  # noqa
-        elif mock_binsize is not None:
-            return negll, likelihood
-        else:
-            return negll
+        return params_meta, noise_meta, dist, dv_meta_considered, likelihood, \
+               likelihood_pdf, criteria_meta, levels_meta, punishment_factor  # noqa
 
     def _negll_meta_noisyreport(self, params, ignore_warnings=False, mock_binsize=None, final=False,
                                 return_noise=False, return_criteria=False, return_levels=False,
@@ -481,9 +540,9 @@ class ReMeta:
         else:
             return negll
 
-
-    def _helper_negll_meta_noisyreport(self, params, ignore_warnings, mock_binsize, final, return_noise,
-                                       return_criteria, return_levels, constraint_mode):
+    def _helper_negll_meta_noisyreport(self, params, ignore_warnings=False, mock_binsize=None, final=False,
+                                       return_noise=False, return_criteria=False, return_levels=False,
+                                       constraint_mode=False):
 
         bl = self.cfg.paramset_meta.base_len
         params_meta = {p: params[int(np.sum(bl[:i]))] if n == 1 else [params[int(np.sum(bl[:i])) + j] for j in range(n)]
@@ -649,9 +708,9 @@ class ReMeta:
         self.model.stimuli_final_thresh[cond_pos] = self.model.stimuli_final[cond_pos]
         dv_sens_mode = np.full(self.model.stimuli_final.shape, np.nan)
         dv_sens_mode[cond_neg] = (np.abs(self.model.stimuli_final[cond_neg]) >= thresh_sens[0]) * \
-            self.model.stimuli_final_thresh[cond_neg] - bias_sens[0]
+            self.model.stimuli_final_thresh[cond_neg] + bias_sens[0]
         dv_sens_mode[cond_pos] = (np.abs(self.model.stimuli_final[cond_pos]) >= thresh_sens[1]) * \
-            self.model.stimuli_final_thresh[cond_pos] - bias_sens[1]
+            self.model.stimuli_final_thresh[cond_pos] + bias_sens[1]
 
         # self.model.stimuli_final_thresh = self.model.stimuli_final - np.sign(self.model.stimuli_final) * thresh_sens
         # dv_sens_mode = (np.abs(self.model.stimuli_final) >= thresh_sens) * self.model.stimuli_final_thresh - bias_sens
@@ -765,19 +824,64 @@ class ReMeta:
 
         return criteria_meta, levels_meta
 
+    def _check_fit(self):
+        if not self.sens_is_fitted and not self.meta_is_fitted:
+            raise RuntimeError('Please fit the model before plotting.')
+        elif self.sens_is_fitted and not self.meta_is_fitted:
+            raise RuntimeError('Only the sensory level was fitted. Please also fit the metacognitive level to plot'
+                               'a link function.')
 
-def load_dataset(name, verbose=True):
-    if name == 'simple':
-        path = os.path.join(pathlib.Path(__file__).parent.resolve(), 'data', 'example_data_simple.pkl')
-        stimuli, choices, confidence, cfg, params = pickle.load(open(path, 'rb'))
+    def plot_link_function(self, **kwargs):
+        self._check_fit()
+        plot_link_function(
+            self.data.stimuli, self.data.confidence, self.model.dv_sens_mode, self.model.params, cfg=self.cfg, **kwargs
+        )
+
+    def plot_confidence_dist(self, **kwargs):
+        self._check_fit()
+        varlik = self.model.dv_meta_considered if self.cfg.meta_noise_type == 'noisy_readout' else self.model.confidence
+        plot_confidence_dist(
+            self.cfg, self.data.stimuli, self.data.confidence, self.model.params, var_likelihood=varlik,
+            noise_meta_transformed=self.model.noise_meta, dv_sens=self.model.dv_sens_considered,
+            likelihood_weighting=self.model.dv_sens_pmf, **kwargs
+        )
+
+
+def load_dataset(name, verbose=True, return_params=False, return_dv_sens=False, return_cfg=False):
+    import gzip
+    path = os.path.join(pathlib.Path(__file__).parent.resolve(), '../demo/data', f'example_data_{name}.pkl.gz')
+    if os.path.exists(path):
+        with gzip.open(path, 'rb') as f:
+            stimuli, choices, confidence, params, cfg, dv_sens, stats = pickle.load(f)
     else:
-        raise ValueError('Unknown dataset name')
+        raise FileNotFoundError(f'[Dataset does not exist!] No such file: {path}')
 
     if verbose:
-        print(f"Loading dataset '{name}' which was generated with the following parameters:")
+        print(f"Loading dataset '{name}' which was generated as follows:")
+        print('..Generative model:')
+        print(f'{TAB}Metatacognitive noise type: {cfg.meta_noise_type}')
+        print(f'{TAB}Metatacognitive noise distribution: {cfg.meta_noise_model}')
+        print(f'{TAB}Link function: {cfg.meta_link_function}')
+        print('..Generative parameters:')
         for i, (k, v) in enumerate(params.items()):
-            print(f'{TAB}[true] {k}: {v:.4g}')
-        print(f'No. subjects: {1 if stimuli.ndim == 1 else len(stimuli)}, '
-              f'No. samples: {stimuli.shape[0] if stimuli.ndim == 1 else stimuli.shape[1]}')
+            if hasattr(v, '__len__'):
+                print(f"{TAB}{k}: {[float(f'{x:.4g}') for x in v]}")
+            else:
+                print(f'{TAB}{k}: {v:.4g}')
+        print('..Characteristics:')
+        print(f'{TAB}No. subjects: {1 if stimuli.ndim == 1 else len(stimuli)}')
+        print(f'{TAB}No. samples: {stimuli.shape[0] if stimuli.ndim == 1 else stimuli.shape[1]}')
+        print(f"{TAB}Type 1 performance: {100*stats['performance']:.1f}%")
+        if not cfg.skip_meta:
+            print(f"{TAB}Avg. confidence: {stats['confidence']:.3f}")
+            print(f"{TAB}M-Ratio: {stats['mratio']:.3f}")
 
-    return stimuli, choices, confidence
+
+    return_list = [stimuli, choices, confidence]
+    if return_params:
+        return_list += [params]
+    if return_cfg:
+        return_list += [cfg]
+    if return_dv_sens:
+        return_list += [dv_sens]
+    return tuple(return_list)
