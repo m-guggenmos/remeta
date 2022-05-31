@@ -5,18 +5,23 @@ from itertools import product
 from multiprocessing import cpu_count
 
 import numpy as np
-from multiprocessing_on_dill.pool import Pool as DillPool
+try:  # only necessary if multiple cores should be used
+    from multiprocessing_on_dill.pool import Pool as DillPool
+except ModuleNotFoundError:
+    pass
 from scipy.optimize import OptimizeResult
 from scipy.optimize import minimize, Bounds, basinhopping
 from scipy.optimize._constraints import old_bound_to_new  # noqa
-from scipy.optimize.slsqp import _epsilon  # noqa
 from .util import TAB
 
 
-def loop(fun, params, args, verbose, param_id):
+_slsqp_epsilon = np.sqrt(np.finfo(float).eps)  # scipy's default value for the SLSQP epsilon parameter
+
+
+def loop(fun, params, args, gridsize, verbose, param_id):
     # t0 = timeit.default_timer()
     if param_id and verbose and (np.mod(param_id, 1000) == 0):
-        print(f'Grid iteration {param_id + 1}')
+        print(f'{TAB}{TAB}Grid iteration {param_id} / {gridsize}')
     result = fun(params[param_id], *args)
     # print(timeit.default_timer() - t0)
     return result
@@ -25,11 +30,11 @@ def loop(fun, params, args, verbose, param_id):
 def fgrid(fun, valid, args, grid_multiproc, verbose=True):
     if grid_multiproc:
         with DillPool(cpu_count() - 1 or 1) as pool:
-            ll_grid = pool.map(partial(loop, fun, valid, args, verbose), range(len(valid)))
+            ll_grid = pool.map(partial(loop, fun, valid, args, len(valid), verbose), range(len(valid)))
     else:
         ll_grid = [None] * len(valid)
         for i, param in enumerate(valid):
-            ll_grid[i] = loop(fun, valid, args, verbose, i)
+            ll_grid[i] = loop(fun, valid, args, len(valid), verbose, i)
     return ll_grid
 
 
@@ -43,7 +48,7 @@ def grid_search(x0, fun, args, param_set, ll_grid, valid, n_grid_candidates, n_g
     counter = 0
     for i in range(n_grid_iter):
         if verbose:
-            print(f'\tGrid iteration {i + 1} / {n_grid_iter}')
+            print(f'{TAB}Grid iteration {i + 1} / {n_grid_iter}')
         gvalid = []
         valid_candidate_ids = []
         grid_range = [None] * len(grid_candidates) * 2
@@ -60,7 +65,7 @@ def grid_search(x0, fun, args, param_set, ll_grid, valid, n_grid_candidates, n_g
             gvalid += gvalid_candidate
             valid_candidate_ids += [j] * len(gvalid_candidate)
             if verbose:
-                print(f'\t\tCandidate {j + 1}: {[(p[0], p[-1]) for p in grid_range[j]]}')  # noqa
+                print(f'{TAB}{TAB}Candidate {j + 1}: {[(p[0], p[-1]) for p in grid_range[j]]}')  # noqa
         gll_grid = fgrid(fun, gvalid, args, grid_multiproc, verbose=False)
         counter += len(gvalid)
 
@@ -70,7 +75,7 @@ def grid_search(x0, fun, args, param_set, ll_grid, valid, n_grid_candidates, n_g
             gx0 = gvalid[min_id]
 
         if verbose:
-            print(f'\t\tBest fit: {gx0} (LL={gll_min_grid})')
+            print(f'{TAB}{TAB}Best fit: {gx0} (LL={gll_min_grid})')
 
         if i != n_grid_iter - 1:
             grid_candidates, candidate_ids = [], []
@@ -88,13 +93,16 @@ def grid_search(x0, fun, args, param_set, ll_grid, valid, n_grid_candidates, n_g
 
 def fmincon(fun, param_set, args, gridsearch=False, grid_multiproc=True,
             gradient_free=False, global_minimization=False, fine_gridsearch=False, verbose=True,
-            n_grid_candidates=10, n_grid_iter=3, gradient_method='slsqp', slsqp_epsilon=_epsilon):
+            n_grid_candidates=10, n_grid_iter=3, gradient_method='slsqp', slsqp_epsilon=_slsqp_epsilon,
+            init_nelder_mead=False, guess=None):
+
+    t0 = timeit.default_timer()
 
     if verbose:
         negll_initial_guess = fun(param_set.guess, *args)
-        print(f'Initial neg. LL: {negll_initial_guess:.2f}')
+        print(f'Initial guess (neg. LL: {negll_initial_guess:.2f})')
         for i, p in enumerate(param_set.names):
-            print(f'{TAB}[initial] {p}: {param_set.guess[i]:.4g}')
+            print(f'{TAB}[guess] {p}: {param_set.guess[i]:.4g}')
 
     bounds = Bounds(*old_bound_to_new(param_set.bounds), keep_feasible=True)
     if gridsearch:
@@ -117,14 +125,16 @@ def fmincon(fun, param_set, args, gridsearch=False, grid_multiproc=True,
             print(f"Grid runtime: {grid_time:.2f} secs")
         fit_grid = OptimizeResult(success=True, x=x0, fun=ll_min_grid, nfev=len(valid))
     else:
-        x0 = param_set.guess
+        if guess is None:
+            x0 = param_set.guess
+        else:
+            x0 = guess
         fit_grid = OptimizeResult(success=True, x=x0, fun=fun(x0, *args), nfev=1)
 
     if fine_gridsearch:
         x0 = grid_search(x0, fun, args, param_set, ll_grid, valid, n_grid_candidates, n_grid_iter,  # noqa
                          grid_multiproc, verbose=verbose).x
 
-    t0 = timeit.default_timer()
     if gradient_free:
         if global_minimization:
             if verbose:
@@ -164,8 +174,17 @@ def fmincon(fun, param_set, args, gridsearch=False, grid_multiproc=True,
         else:
             if verbose:
                 print('Performing local optimization')
+
+            if init_nelder_mead:
+                fit_nelder = minimize(fun, x0, bounds=bounds, args=tuple(args), constraints=param_set.constraints,
+                                      method='nelder-mead')
+                for i, b in enumerate(param_set.bounds):
+                    fit_nelder.x[i] = min(max(fit_nelder.x[i], b[0]), b[1])
+                if fun(fit_nelder.x, *args) < fun(x0, *args):
+                    x0 = fit_nelder.x
             gradient_method = [gradient_method] if isinstance(gradient_method, str) else gradient_method
-            min_fun = np.inf
+            min_fun = fun(x0, *args)
+            fit = fit_grid
             for method in gradient_method:
                 if method == 'slsqp':
                     slsqp_epsilon_ = slsqp_epsilon if hasattr(slsqp_epsilon, '__len__') else [slsqp_epsilon]
@@ -175,12 +194,14 @@ def fmincon(fun, param_set, args, gridsearch=False, grid_multiproc=True,
                         if fit_.fun < min_fun:
                             min_fun = fit_.fun
                             fit = fit_
+                            # x0 = fit_.x  # risk of local minima?
                 else:
                     fit_ = minimize(fun, x0, bounds=bounds, args=tuple(args), constraints=param_set.constraints,
                                     method=method)
                     if fit_.fun < min_fun:
                         min_fun = fit_.fun
                         fit = fit_
+                        # x0 = fit_.x  # risk of local minima?
     fit.execution_time = timeit.default_timer() - t0  # noqa
 
     return fit
