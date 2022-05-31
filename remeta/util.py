@@ -21,7 +21,7 @@ def _check_param(x):
         elif len(x) == 1:
             return [x[0], x[0]]
         else:
-            print(f'Something went wrong, parameter array has {len(x)} values')
+            print(f'Something went wrong, parameter array has length {len(x)}')
     else:
         return [x, x]
 
@@ -50,21 +50,6 @@ def spearman2d(x, y, axis=0):
     xmr, ymr = xr - mxr[..., None], yr - myr[..., None]
     r_num = np.nansum(xmr * ymr, axis=-1)
     r_den = np.sqrt(np.nansum(xmr ** 2, axis=-1) * np.nansum(ymr ** 2, axis=-1))
-    r = r_num / r_den
-    return r
-
-
-def weighted_pearson(x, y, w):
-    xf = np.asarray(x).flatten()
-    yf = np.asarray(y).flatten()
-    w = np.asarray(w).flatten() / np.nansum(w)
-    mx = np.nansum(w * xf)
-    my = np.nansum(w * yf)
-
-    r_num = np.nansum(w * (xf - mx) * (yf - my))
-    s_x = np.nansum(w * (xf - mx) ** 2)
-    s_y = np.nansum(w * (yf - my) ** 2)
-    r_den = np.sqrt(s_x * s_y)
     r = r_num / r_den
     return r
 
