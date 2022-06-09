@@ -45,8 +45,8 @@ class ReMeta:
             self.cfg = cfg
         self.cfg.setup()
 
-        if self.cfg.meta_noise_model.startswith('truncated_') and self.cfg.meta_noise_model.endswith('_lookup'):
-            self.lookup_table = np.load(f"lookup_{self.cfg.meta_noise_model}_{self.cfg.meta_noise_type}.npz")
+        if self.cfg.meta_noise_dist.startswith('truncated_') and self.cfg.meta_noise_dist.endswith('_lookup'):
+            self.lookup_table = np.load(f"lookup_{self.cfg.meta_noise_dist}_{self.cfg.meta_noise_type}.npz")
         else:
             self.lookup_table = None
 
@@ -456,9 +456,9 @@ class ReMeta:
             self.data.confidence_2d, self.cfg.meta_link_function, params_meta,
             criteria_meta=criteria_meta, levels_meta=levels_meta)
 
-        dist = get_dist(self.cfg.meta_noise_model, mode=dv_meta_considered, scale=noise_meta,
+        dist = get_dist(self.cfg.meta_noise_dist, mode=dv_meta_considered, scale=noise_meta,
                         meta_noise_type='noisy_readout', lookup_table=self.lookup_table)
-        if self.cfg.meta_noise_model.startswith('censored_'):
+        if self.cfg.meta_noise_dist.startswith('censored_'):
             with warnings.catch_warnings():
                 warnings.simplefilter('ignore', RuntimeWarning)
                 window = dist.cdf(dv_meta_from_conf_ub) - dist.cdf(dv_meta_from_conf_lb)
@@ -575,13 +575,13 @@ class ReMeta:
         noise_meta = self._noise_meta_transform(self.model.confidence, params_meta, ignore_warnings=ignore_warnings)
         if return_noise:
             return noise_meta
-        if (self.cfg.meta_noise_model == 'beta') and np.any(noise_meta > 0.5):
+        if (self.cfg.meta_noise_dist == 'beta') and np.any(noise_meta > 0.5):
             if np.max(noise_meta) < 0.5 + 1e-5:
                 noise_meta = np.minimum(0.5, noise_meta)
             else:
                 warnings.warn(f'max(noise_intercept_meta) = {np.max(noise_meta):.2f}, but maximum allowed '
                               f'value for noise_intercept_meta is 0.5 for metacognitive type '
-                              f'{self.cfg.meta_noise_type} and noise model {self.cfg.meta_noise_model}')
+                              f'{self.cfg.meta_noise_type} and noise model {self.cfg.meta_noise_dist}')
                 punishment_factor = np.max(noise_meta) / 0.5
                 noise_meta = np.minimum(0.5, noise_meta)
 
@@ -592,11 +592,11 @@ class ReMeta:
             binsize_neg, binsize_pos = binsize + wrap_neg, binsize + wrap_pos
         else:
             binsize_neg, binsize_pos = binsize, binsize
-        dist = get_dist(self.cfg.meta_noise_model, mode=self.model.confidence, scale=noise_meta,
+        dist = get_dist(self.cfg.meta_noise_dist, mode=self.model.confidence, scale=noise_meta,
                         meta_noise_type='noisy_report', lookup_table=self.lookup_table)
         # compute the probability of the actual confidence ratings given the pred confidence
-        if self.cfg.meta_noise_model.startswith('censored_'):
-            if self.cfg.meta_noise_model.endswith('gumbel'):
+        if self.cfg.meta_noise_dist.startswith('censored_'):
+            if self.cfg.meta_noise_dist.endswith('gumbel'):
                 binsize_neg, binsize_pos = np.array(binsize_neg).astype(maxfloat), np.array(binsize_pos).astype(maxfloat)
             with warnings.catch_warnings():
                 warnings.simplefilter('ignore', RuntimeWarning)
@@ -860,7 +860,7 @@ def load_dataset(name, verbose=True, return_params=False, return_dv_sens=False, 
         print(f"Loading dataset '{name}' which was generated as follows:")
         print('..Generative model:')
         print(f'{TAB}Metatacognitive noise type: {cfg.meta_noise_type}')
-        print(f'{TAB}Metatacognitive noise distribution: {cfg.meta_noise_model}')
+        print(f'{TAB}Metatacognitive noise distribution: {cfg.meta_noise_dist}')
         print(f'{TAB}Link function: {cfg.meta_link_function}')
         print('..Generative parameters:')
         for i, (k, v) in enumerate(params.items()):
