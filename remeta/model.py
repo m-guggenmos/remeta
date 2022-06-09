@@ -849,7 +849,7 @@ class ReMeta:
 
 def load_dataset(name, verbose=True, return_params=False, return_dv_sens=False, return_cfg=False):
     import gzip
-    path = os.path.join(pathlib.Path(__file__).parent.resolve(), '../demo/data', f'example_data_{name}.pkl.gz')
+    path = os.path.join(pathlib.Path(__file__).parent.resolve(), 'demo_data', f'example_data_{name}.pkl.gz')
     if os.path.exists(path):
         with gzip.open(path, 'rb') as f:
             stimuli, choices, confidence, params, cfg, dv_sens, stats = pickle.load(f)
