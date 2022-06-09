@@ -314,7 +314,7 @@ def plot_confidence(stimuli, confidence):
 
 
 def plot_link_function(stimuli, confidence, dv_sens_prenoise, params, cfg=None,
-                       meta_noise_type=None, meta_noise_model=None, meta_link_function='probability_correct',
+                       meta_noise_type=None, meta_noise_dist=None, meta_link_function='probability_correct',
                        function_noise_transform_sens=None, detection_model=False,
                        plot_data=True, plot_generative_data=True, plot_likelihood=False,
                        plot_bias_free=False, display_parameters=True,
@@ -326,7 +326,7 @@ def plot_link_function(stimuli, confidence, dv_sens_prenoise, params, cfg=None,
     params = params.copy()
 
     if cfg is not None:
-        meta_noise_model = cfg.meta_noise_model
+        meta_noise_dist = cfg.meta_noise_dist
         meta_link_function = cfg.meta_link_function
         meta_noise_type = cfg.meta_noise_type
         function_noise_transform_sens = cfg.function_noise_transform_sens
@@ -424,10 +424,10 @@ def plot_link_function(stimuli, confidence, dv_sens_prenoise, params, cfg=None,
                 x = np.linspace(0, 1, 1000)
 
                 if meta_noise_type == 'noisy_report':
-                    likelihood = get_likelihood(x, meta_noise_model, np.maximum(1e-3, var_likelihood_means[i]),
+                    likelihood = get_likelihood(x, meta_noise_dist, np.maximum(1e-3, var_likelihood_means[i]),
                                                 noise_meta, logarithm=False)
                 else:
-                    dist = get_dist(meta_noise_model, np.maximum(1e-3, var_likelihood_means[i]), noise_meta)
+                    dist = get_dist(meta_noise_dist, np.maximum(1e-3, var_likelihood_means[i]), noise_meta)
                     dv_meta_generative = dist.rvs(nsamples_dist)
                     conf_generative = link_function(
                         dv_meta_generative, meta_link_function, stimuli=stimuli, dv_sens=dv_meta_generative,
@@ -557,10 +557,10 @@ def plot_link_function_stimspace(cfg, stimuli, confidence, dv_sens_prenoise, par
                     mean() if noise_meta_transformed.ndim == 2 else noise_meta_transformed
                 x = np.linspace(0, 1, 1000)
                 if cfg.meta_noise_type == 'noisy_report':
-                    likelihood = get_likelihood(x, cfg.meta_noise_model, np.maximum(1e-3, var_likelihood_means[i]),
+                    likelihood = get_likelihood(x, cfg.meta_noise_dist, np.maximum(1e-3, var_likelihood_means[i]),
                                                 noise_meta, logarithm=False)
                 else:
-                    dist = get_dist(cfg.meta_noise_model, np.maximum(1e-3, var_likelihood_means[i]), noise_meta)
+                    dist = get_dist(cfg.meta_noise_dist, np.maximum(1e-3, var_likelihood_means[i]), noise_meta)
                     dv_meta_generative = dist.rvs(nsamples_dist)
                     conf_generative = link_function(
                         dv_meta_generative, cfg.meta_link_function, stimuli=stimuli, dv_sens=dv_meta_generative,
@@ -666,13 +666,13 @@ def plot_confidence_dist(cfg, stimuli, confidence, params, nsamples_gen=1000,
                         else noise_meta_transformed
                     x = np.linspace(0, 1, 1000)
                     if cfg.meta_noise_type == 'noisy_report':
-                        likelihood = get_likelihood(x, cfg.meta_noise_model,
-                                              np.maximum(1e-3, confp_means[i][j]),  # noqa
-                                              noise_meta, logarithm=False)
+                        likelihood = get_likelihood(x, cfg.meta_noise_dist,
+                                                    np.maximum(1e-3, confp_means[i][j]),  # noqa
+                                                    noise_meta, logarithm=False)
                     else:
-                        dist = get_dist(cfg.meta_noise_model, np.maximum(1e-3, confp_means[i][j]), noise_meta)
+                        dist = get_dist(cfg.meta_noise_dist, np.maximum(1e-3, confp_means[i][j]), noise_meta)
                         dv_meta_generative = dist.rvs(nsamples_dist)
-                        if 'censored_' in cfg.meta_noise_model:
+                        if 'censored_' in cfg.meta_noise_dist:
                             dv_meta_generative[dv_meta_generative < 0] = 0
                         dvm_to_conf = link_function(
                             dv_meta_generative, cfg.meta_link_function, stimuli=dv_meta_generative,
