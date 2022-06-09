@@ -23,7 +23,7 @@ class Configuration(ReprMixin):
     meta_noise_type : str
         Whether the model considers noise at readout or report.
         Possible values: 'noisy_report', 'noisy_readout'
-    meta_noise_model : str
+    meta_noise_dist : str
         Metacognitive noise distribution.
         Possible valus: 'truncated_norm', 'truncated_gumbel', 'truncated_lognorm',
                         'norm', 'gumbel', 'lognorm', 'beta', 'gamma',
@@ -181,8 +181,10 @@ class Configuration(ReprMixin):
     normalize_stimuli_by_max : bool (default: True)
         If True, normalize provided stimuli by their maximum value.
     confidence_bounds_error : float
-        Set ratings < confidence_bounds_error to 0 and > confidence_bounds_erroror to 1. This might be useful, if
-        'finger errors' are assumed for values close to the scale's extremes.
+        Set confidence < confidence_bounds_error to 0 and > confidence_bounds_erroror to 1. This might be useful
+        for continuous scales, if 'finger errors' are assumed responsible for the fact that confidence sometimes is not
+        *exactly* 0 or 1 but very close (i.e. the assumption is that observers intended to indicate a confidence of 0/1
+        but failed to do so exactly)
 
     *** Parameters for the metacognitive likelihood computation ***
     min_likelihood_sens : float
@@ -215,7 +217,7 @@ class Configuration(ReprMixin):
 
     skip_meta: bool = False
     meta_noise_type: str = 'noisy_report'
-    meta_noise_model: str = 'truncated_norm'
+    meta_noise_dist: str = 'truncated_norm'
     meta_link_function: str = 'probability_correct'
     detection_model: bool = False
     detection_model_nchannels: int = 10
@@ -226,7 +228,7 @@ class Configuration(ReprMixin):
     enable_bias_sens: int = 1
     enable_noise_meta: int = 1
     enable_evidence_bias_mult_meta: int = 1
-    enable_evidence_bias_add_meta: int = 1
+    enable_evidence_bias_add_meta: int = 0
     enable_confidence_bias_mult_meta: int = 0
     enable_confidence_bias_add_meta: int = 0
     enable_criteria_meta: int = 0
@@ -315,7 +317,7 @@ class Configuration(ReprMixin):
     def setup(self):
 
         if self.gradient_free is None:
-            if '_criteria' in self.meta_link_function or '_transform' in self.meta_noise_model:
+            if '_criteria' in self.meta_link_function or '_transform' in self.meta_noise_dist:
                 self.gradient_free = True
             else:
                 self.gradient_free = False
@@ -430,7 +432,7 @@ class Configuration(ReprMixin):
         if self.paramset_meta is None:
 
             if self.enable_noise_meta and self.noise_meta is None:
-                if self.meta_noise_model == 'beta':
+                if self.meta_noise_dist == 'beta':
                     self._noise_meta_default.bounds = (1e-5, 0.5)
                     self._noise_meta_default.grid_range = np.arange(0.05, 0.5, 0.05)
                 elif self.meta_noise_type == 'noisy_readout':
