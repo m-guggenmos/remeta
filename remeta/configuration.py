@@ -31,8 +31,9 @@ class Configuration(ReprMixin):
                         Experimental (for internal use only):
                         'beta_std', 'betaprime', 'lognorm_varstd',
                         'censored_lognorm', 'censored_lognorm_varstd', 'censored_betaprime',
-                        'truncated_norm_lookup', 'truncated_norm_fit', 'truncated_gumbel_lookup',
-                        'truncated_lognorm_varstd'
+                        'truncated_norm_fit', 'truncated_lognorm_varstd',
+                        Works only with lookup table (not deployed via pip):
+                        'truncated_norm_lookup', 'truncated_gumbel_lookup'
     meta_link_function : str
         Metacognitive link function. In case of criterion-based link functions {x} refers to the number of criteria.
         Possible values: 'probability_correct', 'identity', 'tanh', 'normcdf', 'erf', 'alg', 'guder', 'linear',
