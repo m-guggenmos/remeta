@@ -46,7 +46,11 @@ class ReMeta:
         self.cfg.setup()
 
         if self.cfg.meta_noise_dist.startswith('truncated_') and self.cfg.meta_noise_dist.endswith('_lookup'):
-            self.lookup_table = np.load(f"lookup_{self.cfg.meta_noise_dist}_{self.cfg.meta_noise_type}.npz")
+            try:
+                self.lookup_table = np.load(f"lookup_{self.cfg.meta_noise_dist}_{self.cfg.meta_noise_type}.npz")
+            except FileNotFoundError:
+                raise FileNotFoundError('Lookup table not found. Lookup tables are not deployed via pip. You can '
+                                        'download them from Github and put in a directory named "lookup"')
         else:
             self.lookup_table = None
 
