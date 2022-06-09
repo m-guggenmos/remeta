@@ -6,7 +6,7 @@ from scipy.stats import norm, lognorm, beta, betaprime, gamma, uniform, gumbel_r
 from .util import maxfloat
 from .fast_truncnorm import truncnorm
 
-META_NOISE_MODELS = (
+META_NOISE_DIST = (
     'beta', 'beta_std',
     'norm', 'gumbel', 'lognorm', 'lognorm_varstd', 'betaprime', 'gamma',
     'censored_norm', 'censored_gumbel', 'censored_lognorm', 'censored_lognorm_varstd',
@@ -15,8 +15,8 @@ META_NOISE_MODELS = (
     'truncated_gumbel', 'truncated_gumbel_lookup',
     'truncated_lognorm', 'truncated_lognorm_varstd'
 )
-META_NOISE_MODELS_REPORT = ('beta', 'beta_std')
-META_NOISE_MODELS_READOUT = ('lognorm', 'lognorm_varstd', 'betaprime', 'gamma')
+META_NOISE_DIST_REPORT_ONLY = ('beta', 'beta_std')
+META_NOISE_DIST_READOUT_ONLY = ('lognorm', 'lognorm_varstd', 'betaprime', 'gamma')
 
 
 def _lognorm_params(mode, stddev):
@@ -158,22 +158,22 @@ class truncated_gumbel:  # noqa
         return x
 
 
-def get_dist(meta_noise_model, mode, scale, meta_noise_type='noisy_report', lookup_table=None):
+def get_dist(meta_noise_dist, mode, scale, meta_noise_type='noisy_report', lookup_table=None):
     """
     Helper function to select appropriately parameterized metacognitive noise distributions.
     """
 
-    if meta_noise_model not in META_NOISE_MODELS:
-        raise ValueError(f"Unkonwn distribution '{meta_noise_model}'.")
-    elif (meta_noise_type == 'noisy_report') and meta_noise_model in META_NOISE_MODELS_READOUT:
-        raise ValueError(f"Distribution '{meta_noise_model}' is only valid for noisy-readout models.")
-    elif (meta_noise_type == 'noisy_readout') and meta_noise_model in META_NOISE_MODELS_REPORT:
-        raise ValueError(f"Distribution '{meta_noise_model}' is only valid for noisy-report models.")
+    if meta_noise_dist not in META_NOISE_DIST:
+        raise ValueError(f"Unkonwn distribution '{meta_noise_dist}'.")
+    elif (meta_noise_type == 'noisy_report') and meta_noise_dist in META_NOISE_DIST_READOUT_ONLY:
+        raise ValueError(f"Distribution '{meta_noise_dist}' is only valid for noisy-readout models.")
+    elif (meta_noise_type == 'noisy_readout') and meta_noise_dist in META_NOISE_DIST_REPORT_ONLY:
+        raise ValueError(f"Distribution '{meta_noise_dist}' is only valid for noisy-report models.")
 
-    if meta_noise_model.startswith('censored_'):
-        distname = meta_noise_model[meta_noise_model.find('_')+1:]
+    if meta_noise_dist.startswith('censored_'):
+        distname = meta_noise_dist[meta_noise_dist.find('_') + 1:]
     else:
-        distname = meta_noise_model
+        distname = meta_noise_dist
 
     if distname == 'norm':
         dist = norm(loc=mode, scale=scale)
