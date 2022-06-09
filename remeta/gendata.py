@@ -101,10 +101,10 @@ def simu_data(nsubjects, nsamples, params, cfg=None, stimuli_ext=None, verbose=T
                     setattr(cfg, setting, 0)
     cfg.setup()
 
-    if cfg.meta_noise_model is None:
-        cfg.meta_noise_model = dict(noisy_report='beta', noisy_readout='gamma')[cfg.meta_noise_type]
+    if cfg.meta_noise_dist is None:
+        cfg.meta_noise_dist = dict(noisy_report='beta', noisy_readout='gamma')[cfg.meta_noise_type]
 
-    if cfg.meta_noise_model == 'truncated_norm_transform':
+    if cfg.meta_noise_dist == 'truncated_norm_transform':
         if cfg.meta_noise_type == 'noisy_report':
             lookup_table = np.load('lookup_truncated_norm_noisy_report.npz')
         elif cfg.meta_noise_type == 'noisy_readout':
@@ -187,7 +187,7 @@ def simu_data(nsubjects, nsamples, params, cfg=None, stimuli_ext=None, verbose=T
                 )
             else:
                 noise_meta = cfg.noise_meta_default
-            dist = get_dist(cfg.meta_noise_model, mode=dv_meta_prenoise, scale=noise_meta,
+            dist = get_dist(cfg.meta_noise_dist, mode=dv_meta_prenoise, scale=noise_meta,
                             meta_noise_type=cfg.meta_noise_type, lookup_table=lookup_table)  # noqa
 
             dv_meta = np.maximum(0, dist.rvs((nsubjects, nsamples)))
@@ -211,13 +211,13 @@ def simu_data(nsubjects, nsamples, params, cfg=None, stimuli_ext=None, verbose=T
             else:
                 noise_meta = cfg.noise_meta_default
 
-            if cfg.meta_noise_model == 'beta':
+            if cfg.meta_noise_dist == 'beta':
                 if np.any(noise_meta > 0.5):
                     raise ValueError(f'max(noise_meta) = {np.max(noise_meta):.2f}, but maximum allowed value for '
                                      f'noise_meta is 0.5 for metacognitive type {cfg.meta_noise_type} and noise model '
-                                     f'{cfg.meta_noise_model}')
+                                     f'{cfg.meta_noise_dist}')
 
-            dist = get_dist(cfg.meta_noise_model, mode=confidence_prenoise, scale=noise_meta,
+            dist = get_dist(cfg.meta_noise_dist, mode=confidence_prenoise, scale=noise_meta,
                             meta_noise_type=cfg.meta_noise_type, lookup_table=lookup_table)
             confidence = np.maximum(0, np.minimum(1, dist.rvs((nsubjects, nsamples))))
         else:
