@@ -13,9 +13,7 @@ from scipy.optimize import OptimizeResult
 from scipy.optimize import minimize, Bounds, basinhopping
 from scipy.optimize._constraints import old_bound_to_new  # noqa
 from .util import TAB
-
-
-_slsqp_epsilon = np.sqrt(np.finfo(float).eps)  # scipy's default value for the SLSQP epsilon parameter
+from .util import _slsqp_epsilon
 
 
 def loop(fun, params, args, gridsize, verbose, param_id):

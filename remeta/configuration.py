@@ -3,11 +3,11 @@ from dataclasses import dataclass
 from typing import Callable, Dict, Union, List
 
 import numpy as np
-from scipy.optimize.slsqp import _epsilon  # noqa
 
 from .modelspec import Parameter, ParameterSet
-from .util import ReprMixin
+from .util import ReprMixin, _slsqp_epsilon
 from importlib.util import find_spec
+
 
 
 @dataclass
@@ -327,7 +327,7 @@ class Configuration(ReprMixin):
             if self.meta_noise_type == 'noisy_readout':
                 self.slsqp_epsilon = 1e-4
             else:
-                self.slsqp_epsilon = _epsilon
+                self.slsqp_epsilon = _slsqp_epsilon
 
         if self._confidence_bias_mult_meta_default is None and (self.meta_noise_type == 'noisy_readout'):
             self._confidence_bias_mult_meta_default = Parameter(guess=1, bounds=(0.1, 10),

@@ -7,6 +7,7 @@ from scipy.stats import rankdata
 
 TAB = '    '
 maxfloat = np.float128 if hasattr(np, 'float128') else np.longdouble
+_slsqp_epsilon = np.sqrt(np.finfo(float).eps)  # scipy's default value for the SLSQP epsilon parameter
 
 
 class ReprMixin:
