@@ -363,6 +363,7 @@ def plot_link_function(stimuli, confidence, dv_sens_prenoise, params, cfg=None,
     # We set these parameters to zero, since the link function should not be affected by this
     # (ToDo: this is caused by the fact that in the toolbox we do not cleanly separate between the link function
     #        and parameters that affect confidence after the link function)
+    orig_params = params.copy()
     if 'confidence_bias_mult_meta' in params:
         params['confidence_bias_mult_meta'] = 1
     if 'confidence_bias_add_meta' in params:
@@ -483,13 +484,13 @@ def plot_link_function(stimuli, confidence, dv_sens_prenoise, params, cfg=None,
     if display_parameters:
         # an_params = [p for p in params if '_meta' in p and not (('criteri' in p or 'levels' in p) and
         #                                                           '_criteria' in meta_link_function)]
-        an_params = [p for p in params if '_meta' in p]
+        an_params = [p for p in orig_params if '_meta' in p]
         an_meta = []
         for p in an_params:
-            if hasattr(params[p], '__len__'):
-                an_meta += [f"${symbols[p][1:-1]}=${[float(f'{v:.3f}') for v in params[p]]}"]
+            if hasattr(orig_params[p], '__len__'):
+                an_meta += [f"${symbols[p][1:-1]}=${[float(f'{v:.3f}') for v in orig_params[p]]}"]
             else:
-                an_meta += [f"${symbols[p][1:-1]}={params[p]:{'.0f' if params[p] == 0 else ('.3f', '.2f')[figure_paper]}}$"]
+                an_meta += [f"${symbols[p][1:-1]}={orig_params[p]:{'.0f' if orig_params[p] == 0 else ('.3f', '.2f')[figure_paper]}}$"]
         plt.text(1.045, -0.2, r'Estimated parameters:' + '\n' + '\n'.join(an_meta), transform=plt.gca().transAxes,
                  bbox=dict(fc=[1, 1, 1], ec=[0.5, 0.5, 0.5], lw=1, pad=5), fontsize=9)
 
