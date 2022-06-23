@@ -9,14 +9,14 @@ from confidence.mca.type2roc import type2roc
 from scipy.stats import norm
 import gzip
 
-mode = 'simple'
+# mode = 'simple'
 # mode = 'sens_complex'
 # mode = 'meta_simple'
 # mode = 'meta_complex'
-# mode = 'meta'
+# mode = 'meta_add'
 # mode = 'noisy_readout'
 # mode = 'criteria'
-# mode = 'criteria_levels'
+mode = 'criteria_levels'
 
 def conf(x, bounds):
     confidence = np.full(x.shape, np.nan)
@@ -63,7 +63,7 @@ elif mode == 'meta_simple':
         evidence_bias_mult_meta=0.8,
     )
     cfg = remeta.Configuration()
-elif mode == 'meta':
+elif mode == 'meta_add':
     nsamples = 1000
     seed = 1
     stimuli_stepsize = 0.25
@@ -153,10 +153,11 @@ if not cfg.skip_meta:
     stats['auroc2'] = type2roc(correct, data.confidence)
     stats['mratio'] = fit.M_ratio
 
-path = os.path.join(pathlib.Path(__file__).parent.resolve(), '..', 'demo/data', f'example_data_{mode}.pkl.gz')
+path = os.path.join(pathlib.Path(__file__).parent.resolve(), '..', 'remeta/demo_data', f'example_data_{mode}.pkl.gz')
 save = (data.stimuli, data.choices, data.confidence, params, data.cfg, data.dv_sens_prenoise, stats)
 with gzip.open(path, "wb") as f:
     pickle.dump(save, f)
+print(f'Saved to {path}')
 
 
 # import bz2
