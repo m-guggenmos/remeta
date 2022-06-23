@@ -482,7 +482,7 @@ class ReMeta:
             else:
                 likelihood_pdf = None
 
-        if not self.cfg.detection_model and not self.cfg.experimental_include_incongruent_dv:
+        if not self.cfg.detection_model and self.cfg.experimental_exclude_incongruent_dv:
             likelihood[self.model.dv_sens_considered_invalid] = np.nan
 
         return params_meta, noise_meta, dist, dv_meta_considered, likelihood, \
@@ -629,7 +629,7 @@ class ReMeta:
             else:
                 likelihood_pdf = None
 
-        if not self.cfg.detection_model and not self.cfg.experimental_include_incongruent_dv:
+        if not self.cfg.detection_model and self.cfg.experimental_exclude_incongruent_dv:
             likelihood[self.model.dv_sens_considered_invalid] = np.nan
             self.model.confidence[self.model.dv_sens_considered_invalid] = np.nan
 
@@ -772,7 +772,7 @@ class ReMeta:
             # normalize PMF
             self.model.dv_sens_pmf = self.model.dv_sens_pmf / self.model.dv_sens_pmf.sum(axis=1).reshape(-1, 1)
             # invalidate invalid decision values
-            if not self.cfg.experimental_include_incongruent_dv:
+            if not self.cfg.experimental_exclude_incongruent_dv:
                 self.model.dv_sens_considered_invalid = np.sign(self.model.dv_sens_considered) != \
                                                         np.sign(self.data.choices_2d - 0.5)
                 self.model.dv_sens_pmf[self.model.dv_sens_considered_invalid] = np.nan

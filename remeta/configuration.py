@@ -202,6 +202,11 @@ class Configuration(ReprMixin):
     experimental_likelihood : bool
         Instead of using a minimum probability during the likelihood computation, use a maximum cumulative
         likelihood based on a 'guessing' model
+    experimental_wrap_binsize_meta : bool (default: False)
+        Ensure constant window size for likelihood integration at the bounds
+    experimental_exclude_incongruent_dv : bool (default: False)
+        Exclude incongruent decision values (i.e., sign(actual choice) != sign(decision value)) for the likelihood
+        computation
 
     *** Other ***
     true_params : Dict
@@ -281,7 +286,7 @@ class Configuration(ReprMixin):
     nbins_dv: int = 101
     experimental_likelihood: bool = False
     experimental_wrap_binsize_meta: bool = False
-    experimental_include_incongruent_dv: bool = False
+    experimental_exclude_incongruent_dv: bool = False
 
     true_params: Dict = None
     force_settings: bool = False
