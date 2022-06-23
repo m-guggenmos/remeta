@@ -57,7 +57,7 @@ class ReMeta:
         self.model = Model(cfg=self.cfg)
         self.data = None
 
-        self._punish_message = False
+        # self._punish_message = False
 
         self.sens_is_fitted = False
         self.meta_is_fitted = False
@@ -430,9 +430,9 @@ class ReMeta:
                 bds = [(params[i] >= b[0]) & (params[i] <= b[1]) for i, b in enumerate(self.cfg.paramset_meta.bounds)]
                 cns = [con['fun'](params) >= 0 for con in self.cfg.paramset_meta.constraints]
                 if not np.all(cns) or not np.all(bds):
-                    if not self._punish_message:
-                        print('punish!')
-                        self._punish_message = True
+                    # if not self._punish_message:
+                    #     print('punish!')
+                    #     self._punish_message = True
                     punishment_factor = 10
         else:
             criteria_meta, levels_meta = None, None
@@ -482,7 +482,7 @@ class ReMeta:
             else:
                 likelihood_pdf = None
 
-        if not self.cfg.detection_model and self.cfg.experimental_exclude_incongruent_dv:
+        if not self.cfg.detection_model and not self.cfg.experimental_include_incongruent_dv:
             likelihood[self.model.dv_sens_considered_invalid] = np.nan
 
         return params_meta, noise_meta, dist, dv_meta_considered, likelihood, \
@@ -564,9 +564,9 @@ class ReMeta:
                 bds = [(params[i] >= b[0]) & (params[i] <= b[1]) for i, b in enumerate(self.cfg.paramset_meta.bounds)]
                 cns = [con['fun'](params) >= 0 for con in self.cfg.paramset_meta.constraints]
                 if not np.all(cns) or not np.all(bds):
-                    if not self._punish_message:
-                        print('punish!')
-                        self._punish_message = True
+                    # if not self._punish_message:
+                    #     print('punish!')
+                    #     self._punish_message = True
                     punishment_factor = 10
         else:
             criteria_meta, levels_meta = None, None
@@ -629,7 +629,7 @@ class ReMeta:
             else:
                 likelihood_pdf = None
 
-        if not self.cfg.detection_model and self.cfg.experimental_exclude_incongruent_dv:
+        if not self.cfg.detection_model and not self.cfg.experimental_include_incongruent_dv:
             likelihood[self.model.dv_sens_considered_invalid] = np.nan
             self.model.confidence[self.model.dv_sens_considered_invalid] = np.nan
 
@@ -772,7 +772,7 @@ class ReMeta:
             # normalize PMF
             self.model.dv_sens_pmf = self.model.dv_sens_pmf / self.model.dv_sens_pmf.sum(axis=1).reshape(-1, 1)
             # invalidate invalid decision values
-            if self.cfg.experimental_exclude_incongruent_dv:
+            if not self.cfg.experimental_include_incongruent_dv:
                 self.model.dv_sens_considered_invalid = np.sign(self.model.dv_sens_considered) != \
                                                         np.sign(self.data.choices_2d - 0.5)
                 self.model.dv_sens_pmf[self.model.dv_sens_considered_invalid] = np.nan
