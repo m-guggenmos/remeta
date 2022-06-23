@@ -1,2 +1,3 @@
 global-exclude *.py[co]
 graft remeta/demo_data
+recursive-exclude remeta/lookup *
