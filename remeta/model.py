@@ -469,10 +469,14 @@ class ReMeta:
                 likelihood = (dv_meta_from_conf > 1e-8) * window + \
                              (dv_meta_from_conf <= 1e-8) * dist.cdf(dv_meta_from_conf + binsize_pos)
             if final:
+                try:
+                    cdf2 = dist.cdf(dv_meta_from_conf.astype(maxfloat) + binsize_pos).astype(np.float64)
+                except TypeError:
+                    # may currently fail for the normal distribution because np.float128 is not supported
+                    cdf2 = dist.cdf(dv_meta_from_conf + binsize_pos)
                 likelihood_pdf = (dv_meta_from_conf > 1e-8) * \
                                  dist.pdf(dv_meta_from_conf.astype(maxfloat)).astype(np.float64) + \
-                                (dv_meta_from_conf <= 1e-8) * \
-                                 dist.cdf(dv_meta_from_conf.astype(maxfloat) + binsize_pos).astype(np.float64)
+                                 (dv_meta_from_conf <= 1e-8) * cdf2
             else:
                 likelihood_pdf = None
         else:
