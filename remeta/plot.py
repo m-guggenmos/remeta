@@ -277,7 +277,10 @@ def plot_psychometric(choices, stimuli, params, cfg=None, detection_model=False,
     ax.xaxis.set_major_formatter(FormatStrFormatter('%.2g'))
     leg = plt.legend(bbox_to_anchor=(1.02, 1), loc="upper left", fontsize=9, handlelength=0.5)
     for lh in leg.legendHandles:
-        lh._legmarker.set_alpha(1)  # noqa
+        if hasattr(lh, '_legmarker'):
+            lh._legmarker.set_alpha(1)  # noqa
+        elif hasattr(lh, 'legmarker'):
+            lh.legmarker.set_alpha(1)  # noqa
     anot_sens = []
     for i, (k, v) in enumerate(params_sens.items()):
         if (cfg is None and k in params_sens) or (cfg is not None and getattr(cfg, f'enable_{k}')):
