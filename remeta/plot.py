@@ -75,6 +75,7 @@ def logistic_old(x, sigma, thresh, bias):
                 1 / (1 + np.exp(-beta * (x + bias - np.sign(x) * thresh)))) + \
         (np.abs(x) < thresh) * (1 / (1 + np.exp(beta * bias)))
 
+
 def posterior_detection(x, sigma, thresh, bias, nchannels):
     y = (np.abs(x) > thresh) * x + bias
     p_active = np.tanh(np.abs(y) / sigma)  # probability that a channel is active
@@ -105,7 +106,7 @@ def plot_meta_condensed(ax, s, m, m2=None, nsamples_gen=1000):
         params_meta = m.model.params_meta
         if '_criteria' in cfg.meta_link_function:
             params_meta['evidence_bias_mult_meta'] = [v for k, v in m.model.params_meta.items() if
-                                         'criterion_meta' in k or 'confidence_level' in k]
+                                                      'criterion_meta' in k or 'confidence_level' in k]
         data = m.data.data
         stimuli_norm = data.stimuli_norm
         confidence = data.confidence
@@ -135,7 +136,7 @@ def plot_meta_condensed(ax, s, m, m2=None, nsamples_gen=1000):
             params_meta2 = m2.model.params_meta
             if '_criteria' in cfg2.meta_link_function:
                 params_meta2['evidence_bias_mult_meta'] = [v for k, v in m2.model.params_meta.items() if
-                                              'criterion_meta' in k or 'confidence_level' in k]
+                                                           'criterion_meta' in k or 'confidence_level' in k]
         else:
             params_sens2 = m2.params_sens
             params_meta2 = m2.params_meta
@@ -160,7 +161,7 @@ def plot_meta_condensed(ax, s, m, m2=None, nsamples_gen=1000):
             counts_gen[k] += [np.histogram(simu.confidence[np.tile(stimuli_norm, (nsamples_gen, 1)) == v], density=True,
                                            bins=bins[k][i])[0] / (len(bins[k][i]) - 1)]
             if m2 is not None:
-                counts_gen2[k] += [np.histogram(simu2.confidence[np.tile(stimuli_norm, (nsamples_gen, 1)) == v],
+                counts_gen2[k] += [np.histogram(simu2.confidence[np.tile(stimuli_norm, (nsamples_gen, 1)) == v],  # noqa
                                                 density=True, bins=bins[k][i])[0] / (len(bins[k][i]) - 1)]
     counts = np.array(counts) / np.max(counts)
     counts_gen = np.array(counts_gen) / np.max(counts_gen)
@@ -178,7 +179,7 @@ def plot_meta_condensed(ax, s, m, m2=None, nsamples_gen=1000):
                      color=0.85 * color_generative_meta, zorder=11, lw=1.5,
                      label='Model: density' if ((k == 0) & (i == 0)) else None)
             if m2 is not None:
-                plt.plot(v + (1, -1)[k] * 0.3 * counts_gen2[k, i],
+                plt.plot(v + (1, -1)[k] * 0.3 * counts_gen2[k, i],  # noqa
                          bins[k, i][:-1] + (bins[k, i][1] - bins[k, i][0]) / 2, '--', dashes=(3, 2.4),
                          color=0.85 * color_generative_meta2,
                          zorder=11, lw=1.5, label='Model: density' if ((k == 0) & (i == 0)) else None)
@@ -198,11 +199,15 @@ def plot_meta_condensed(ax, s, m, m2=None, nsamples_gen=1000):
     if np.mod(s, 4) != 0:
         plt.yticks([])
     title = r"$\delta_\mathrm{m}$=" + f"${params_meta['evidence_bias_add_meta']:.2f}$ " + r"$\varphi_\mathrm{m}$=" +\
-            f"${params_meta['evidence_bias_mult_meta']:.2f}$ " + r"$\sigma_\mathrm{m}$=" + f"${params_meta['noise_meta']:.2f}$"
+            f"${params_meta['evidence_bias_mult_meta']:.2f}$ " + r"$\sigma_\mathrm{m}$=" + \
+            f"${params_meta['noise_meta']:.2f}$"
     if m2 is not None:
-        title2 = r"$\delta_\mathrm{m}$=" + f"${params_meta2['evidence_bias_add_meta']:.2f}$ " + r"$\varphi_\mathrm{m}$=" +\
-                 f"${params_meta2['evidence_bias_mult_meta']:.2f}$ " + r"$\sigma_\mathrm{m}$=" +\
-                 f"${params_meta2['noise_meta']:.2f}$"
+        params_meta_ = params_meta2  # noqa
+        title2 = r"$\delta_\mathrm{m}$=" + \
+                 f"${params_meta_['evidence_bias_add_meta']:.2f}$ " + \
+                 r"$\varphi_\mathrm{m}$=" +\
+                 f"${params_meta_['evidence_bias_mult_meta']:.2f}$ " + r"$\sigma_\mathrm{m}$=" +\
+                 f"${params_meta_['noise_meta']:.2f}$"
         plt.text(0, 1.23, title, fontsize=8.5, color=np.array([165, 110, 0])/255, ha='center')
         plt.text(0, 1.13, title2, fontsize=8.5, color=np.array([30, 98, 38])/255, ha='center')
     else:
@@ -217,14 +222,15 @@ def plot_psychometric_sim(data, detection_model=False, detection_model_nchannels
 
 
 def plot_psychometric(choices, stimuli, params, cfg=None, detection_model=False,
-                      detection_model_nchannels=None, figure_paper=False, fit_only=False,
-                      highlight_fit=False):
+                      detection_model_nchannels=None,
+                      figure_paper=False,  # noqa - keep for now
+                      fit_only=False, highlight_fit=False):
 
     params_sens = {k: v for k, v in params.items() if k.endswith('_sens')}
 
     noise_sens = _check_param(params_sens['noise_sens'])
     if (cfg is None and 'thresh_sens' in params_sens) or (cfg is not None and cfg.enable_thresh_sens):
-        thresh_sens =_check_param(params_sens['thresh_sens'])
+        thresh_sens = _check_param(params_sens['thresh_sens'])
     else:
         thresh_sens = [0, 0]
     if (cfg is None and 'bias_sens' in params_sens) or (cfg is not None and cfg.enable_bias_sens):
@@ -285,10 +291,10 @@ def plot_psychometric(choices, stimuli, params, cfg=None, detection_model=False,
     for i, (k, v) in enumerate(params_sens.items()):
         if (cfg is None and k in params_sens) or (cfg is not None and getattr(cfg, f'enable_{k}')):
             if hasattr(v, '__len__'):
-                val = ', '.join([f"{p:{'.0f' if p == 0 else ('.3g','.2g')[figure_paper]}}" for p in v])
+                val = ', '.join([f"{p:{'.0f' if p == 0 else '.3g'}}" for p in v])
                 anot_sens += [f"${symbols[k][1:-1]}=" + f"[{val}]$"]
             else:
-                anot_sens += [f"${symbols[k][1:-1]}={v:{'.0f' if v == 0 else ('.3g','.2g')[figure_paper]}}$"]
+                anot_sens += [f"${symbols[k][1:-1]}={v:{'.0f' if v == 0 else '.3g'}}$"]
     plt.text(1.045, -0.1, r'Estimated parameters:' + '\n' + '\n'.join(anot_sens), transform=plt.gca().transAxes,
              bbox=dict(fc=[1, 1, 1], ec=[0.5, 0.5, 0.5], lw=1, pad=5), fontsize=9)
     set_fontsize(label=13, tick=11)
@@ -362,7 +368,6 @@ def plot_link_function(stimuli, confidence, dv_sens_prenoise, params, cfg=None,
     generative = simu_data(nsamples_gen, len(stimuli), params, cfg=cfg, stimuli_ext=stimuli,
                            verbose=False, squeeze=True)
 
-
     # We set these parameters to zero, since the link function should not be affected by this
     # (ToDo: this is caused by the fact that in the toolbox we do not cleanly separate between the link function
     #        and parameters that affect confidence after the link function)
@@ -419,7 +424,8 @@ def plot_link_function(stimuli, confidence, dv_sens_prenoise, params, cfg=None,
             if detection_model:
                 var_likelihood_means = [np.nanmean(var_likelihood[dv_sens_prenoise == v]) for v in vals_dv_]
             else:
-                var_likelihood_means = [np.nanmean(var_likelihood[dv_sens_prenoise == v, dv_range[1]]) for v in vals_dv_]
+                var_likelihood_means = [np.nanmean(var_likelihood[dv_sens_prenoise == v, dv_range[1]]) for v in
+                                        vals_dv_]
 
             for i, v in enumerate(vals_dv_):
 
@@ -483,7 +489,6 @@ def plot_link_function(stimuli, confidence, dv_sens_prenoise, params, cfg=None,
         plt.legend(bbox_to_anchor=(1.01, 1), loc="upper left", fontsize=9)
     ax.yaxis.grid('on', color=[0.9, 0.9, 0.9])
 
-
     if display_parameters:
         # an_params = [p for p in params if '_meta' in p and not (('criteri' in p or 'levels' in p) and
         #                                                           '_criteria' in meta_link_function)]
@@ -493,128 +498,9 @@ def plot_link_function(stimuli, confidence, dv_sens_prenoise, params, cfg=None,
             if hasattr(orig_params[p], '__len__'):
                 an_meta += [f"${symbols[p][1:-1]}=${[float(f'{v:.3f}') for v in orig_params[p]]}"]
             else:
-                an_meta += [f"${symbols[p][1:-1]}={orig_params[p]:{'.0f' if orig_params[p] == 0 else ('.3f', '.2f')[figure_paper]}}$"]
+                an_meta += [f"${symbols[p][1:-1]}={orig_params[p]:{'.0f' if orig_params[p] == 0 else ('.3f', '.2f')[figure_paper]}}$"]  # noqa
         plt.text(1.045, -0.2, r'Estimated parameters:' + '\n' + '\n'.join(an_meta), transform=plt.gca().transAxes,
                  bbox=dict(fc=[1, 1, 1], ec=[0.5, 0.5, 0.5], lw=1, pad=5), fontsize=9)
-
-    set_fontsize(label=13, tick=11)
-
-    return ax
-
-
-def plot_link_function_stimspace(cfg, stimuli, confidence, dv_sens_prenoise, params_sens, params_meta,
-                                 plot_likelihood=False, var_likelihood=None, noise_meta_transformed=None,
-                                 dv_range=(45, 50, 55), nsamples_gen=1000, nsamples_dist=100000, bw=0.03,
-                                 color_linkfunction=(0.55, 0.55, 0.69), figure_paper=False):
-
-    ax = plt.gca()
-
-    generative = simu_data(nsamples_gen, len(stimuli), {**params_sens, **params_meta}, cfg=cfg, stimuli_ext=stimuli,
-                           verbose=False, squeeze=True)
-
-    levels = np.unique(stimuli)
-
-    for k in range(2):
-
-        levels_ = levels[levels < 0] if k == 0 else levels[levels > 0]
-
-        conf_data_means = [np.mean(confidence[stimuli == v]) for v in levels_]
-        conf_data_std_neg = [np.std(confidence[(stimuli == v) & (confidence < conf_data_means[i])]) for i, v in
-                             enumerate(levels_)]
-        conf_data_std_pos = [np.std(confidence[(stimuli == v) & (confidence >= conf_data_means[i])]) for i, v in
-                             enumerate(levels_)]
-
-        conf_gen_means = [np.mean(generative.confidence[:, stimuli == v]) for v in levels_]
-        conf_gen_std_neg = [np.std(generative.confidence[(np.tile(stimuli, (nsamples_gen, 1)) == v) & (generative.confidence < conf_gen_means[i])])
-                            for i, v in enumerate(levels_)]
-        conf_gen_std_pos = [np.std(generative.confidence[(np.tile(stimuli, (nsamples_gen, 1)) == v) & (generative.confidence > conf_gen_means[i])])
-                            for i, v in enumerate(levels_)]
-
-        _, cap, barlinecols = plt.errorbar(
-            levels_-0.015 + (k == 0)*0.006 - (k == 1)*0.006, conf_data_means, yerr=[conf_data_std_neg, conf_data_std_pos],
-            label='Data: Mean (SD)' if k == 0 else None, marker='o', markersize=7, mew=1, mec='k', color='None',
-            ecolor='k', mfc=color_data, clip_on=False, zorder=35, elinewidth=1.5, capsize=5
-        )
-        [cap[i].set_markeredgewidth(1.5) for i in range(len(cap))]
-        [cap[i].set_clip_on(False) for i in range(len(cap))]
-        barlinecols[0].set_clip_on(False)
-
-        _, cap, barlinecols = plt.errorbar(
-            levels_+0.015 + (k == 0)*0.006 - (k == 1)*0.006, conf_gen_means, yerr=[conf_gen_std_neg, conf_gen_std_pos],
-            label='Generative model' if k == 0 else None, marker='o', markersize=7, mew=1, mec='k',
-            color='None', ecolor=color_generative_meta, mfc=color_generative_meta, clip_on=False, zorder=35,
-            elinewidth=1.5, capsize=5
-        )
-        [cap[i].set_markeredgewidth(1.5) for i in range(len(cap))]
-        [cap[i].set_clip_on(False) for i in range(len(cap))]
-        barlinecols[0].set_clip_on(False)
-
-        if plot_likelihood:
-            if cfg.detection_model:
-                var_likelihood_means = [np.nanmean(var_likelihood[stimuli == v]) for v in levels_]
-            else:
-                var_likelihood_means = [np.nanmean(var_likelihood[stimuli == v, dv_range[1]]) for v in levels_]
-
-            for i, v in enumerate(levels_):
-
-                noise_meta = noise_meta_transformed[stimuli == v, int(noise_meta_transformed.shape[1] / 2)].\
-                    mean() if noise_meta_transformed.ndim == 2 else noise_meta_transformed
-                x = np.linspace(0, 1, 1000)
-                if cfg.meta_noise_type == 'noisy_report':
-                    likelihood = get_likelihood(x, cfg.meta_noise_dist, np.maximum(1e-3, var_likelihood_means[i]),
-                                                noise_meta, logarithm=False)
-                else:
-                    dist = get_dist(cfg.meta_noise_dist, np.maximum(1e-3, var_likelihood_means[i]), noise_meta)
-                    dv_meta_generative = dist.rvs(nsamples_dist)
-                    conf_generative = link_function(
-                        dv_meta_generative, cfg.meta_link_function, stimuli=stimuli, dv_sens=dv_meta_generative,
-                        function_noise_transform_sens=cfg.function_noise_transform_sens, **params_sens, **params_meta
-                    )
-                    likelihood = gaussian_kde(conf_generative, bw_method=bw).evaluate(x)
-                likelihood -= likelihood.min()
-                like_max = likelihood.max()
-                likelihood_norm = likelihood / like_max if like_max > 0 else np.zeros(likelihood.shape)
-                plt.plot(
-                    v + (0.26 * likelihood_norm + 0.005) * ((1, -1)[k]), x, color=color_model, zorder=25, lw=2.5,
-                    # label=(None, r'Likelihood for $\overline{y}$')[int((k == 0) & (i == 0))]
-                    label=(None, r'Likelihood for $y_i^*$')[int((k == 0) & (i == 0))]
-                )
-
-                # ax.annotate(rf"$\mathbf{{\overline{{y}}_{{{('', '+')[k]}{(i - len(levels_), i + 1)[k]}}}}}$",
-                #             xy=(v, 1.008), xycoords='data', xytext=(v, 1.09), color=color_model, weight='bold',
-                #             fontsize=9, ha='center', bbox=dict(pad=0, facecolor='w', lw=0),
-                #             arrowprops=dict(facecolor=color_model, headwidth=7, lw=0, headlength=3, width=2))
-
-        xrange = np.arange(-5, 0.001, 0.001) if k == 0 else np.arange(0, 5.001, 0.001)
-        conf_model = link_function(
-            params_meta['evidence_bias_mult_meta'] * np.abs(xrange + params_sens['bias_sens']) + params_meta['evidence_bias_add_meta'],
-            cfg.meta_link_function, stimuli=xrange, dv_sens=xrange,
-            function_noise_transform_sens=cfg.function_noise_transform_sens, **params_sens, **params_meta
-        )
-        plt.plot(xrange, conf_model, color=color_linkfunction, lw=3.5, zorder=5, alpha=0.9,
-                 label='Link function' if k == 0 else None)
-
-    ylim = (-0.01, 1.01)
-    plt.plot([0, 0], ylim, 'k-', lw=0.5)
-    plt.ylim(ylim)
-    plt.xlim((-1.05 * np.abs(levels).max(), 1.05 * np.abs(levels).max()))
-    plt.xlabel(r'Stimulus ($x$)')
-    plt.ylabel('Confidence')
-    handles, labels = plt.gca().get_legend_handles_labels()
-    if plot_likelihood:
-        order = [2, 1, 0, 3]
-        plt.legend([handles[i] for i in order], [labels[i] for i in order], bbox_to_anchor=(1.02, 1), loc="upper left",
-                   fontsize=9)
-    else:
-        plt.legend(bbox_to_anchor=(1.01, 1), loc="upper left", fontsize=9)
-    ax.yaxis.grid('on', color=[0.9, 0.9, 0.9])
-    ax.xaxis.set_major_formatter(FormatStrFormatter('%.2g'))
-
-    anot_meta = \
-        [f"${symbols[p][1:-1]}={params_meta[p]:{'.0f' if params_meta[p] == 0 else ('.3f', '.2f')[figure_paper]}}$" for
-         p in params_meta if not ((p == 'evidence_bias_mult_meta') and '_criteria' in cfg.meta_link_function)]
-    plt.text(1.045, -0.2, r'Estimated parameters:' + '\n' + '\n'.join(anot_meta), transform=plt.gca().transAxes,
-             bbox=dict(fc=[1, 1, 1], ec=[0.5, 0.5, 0.5], lw=1, pad=5), fontsize=9)
 
     set_fontsize(label=13, tick=11)
 
@@ -651,7 +537,8 @@ def plot_confidence_dist(cfg, stimuli, confidence, params, nsamples_gen=1000,
 
         if plot_likelihood:
             confp_means = [[np.nanmean(var_likelihood[stimuli == v, z]) for z in dv_range] for v in levels_]
-            weighting_p = np.array([[np.nanmean(likelihood_weighting[stimuli == v, z]) for z in dv_range] for v in levels_])
+            weighting_p = np.array([[np.nanmean(likelihood_weighting[stimuli == v, z]) for z in dv_range] for v in
+                                    levels_])
             weighting_p /= np.max(weighting_p)
 
         for i, v in enumerate(levels_):

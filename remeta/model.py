@@ -14,10 +14,10 @@ from .dist import get_dist
 from .fit import fmincon
 from .gendata import simu_data
 from .modelspec import Model, Data
-from .transform import warp, noise_meta_transform, noise_sens_transform, logistic, link_function, link_function_inv
-from .util import print_warnings, _check_param, TAB
-from .util import maxfloat
 from .plot import plot_link_function, plot_confidence_dist
+from .transform import warp, noise_meta_transform, noise_sens_transform, logistic, link_function, link_function_inv
+from .util import _check_param, TAB
+from .util import maxfloat
 
 np.set_printoptions(suppress=True)
 
@@ -183,7 +183,7 @@ class ReMeta:
                 fitinfo_meta = self.fun_meta(list(self.model.params_meta.values()), *args_meta, final=True)  # noqa
                 self.model.store_meta(*fitinfo_meta)
             else:
-                with warnings.catch_warnings(record=True) as w:
+                with warnings.catch_warnings(record=True) as w:  # noqa
                     warnings.filterwarnings('ignore', module='scipy.optimize')
                     # prepare constraints for metacognitive parameters (which may depend on decision values)
                     if self.cfg.paramset_meta.nparams > 0:
@@ -357,7 +357,8 @@ class ReMeta:
             Negative (summed) log likelihood.
         """
 
-        params_meta, noise_meta, dist, dv_meta_considered, likelihood, likelihood_pdf, criteria_meta, levels_meta, punishment_factor = \
+        params_meta, noise_meta, dist, dv_meta_considered, likelihood, likelihood_pdf, criteria_meta, levels_meta, \
+            punishment_factor = \
             self._helper_negll_meta_noisyreadout(params, ignore_warnings, mock_binsize, final, return_noise,
                                                  return_criteria, return_levels, constraint_mode)
 
@@ -475,8 +476,7 @@ class ReMeta:
                     # may currently fail for the normal distribution because np.float128 is not supported
                     cdf2 = dist.cdf(dv_meta_from_conf + binsize_pos)
                 likelihood_pdf = (dv_meta_from_conf > 1e-8) * \
-                                 dist.pdf(dv_meta_from_conf.astype(maxfloat)).astype(np.float64) + \
-                                 (dv_meta_from_conf <= 1e-8) * cdf2
+                    dist.pdf(dv_meta_from_conf.astype(maxfloat)).astype(np.float64) + (dv_meta_from_conf <= 1e-8) * cdf2
             else:
                 likelihood_pdf = None
         else:
@@ -527,7 +527,8 @@ class ReMeta:
             Negative (summed) log likelihood.
         """
 
-        params_meta, noise_meta, model_confidence, dist, dv_meta_considered, likelihood, likelihood_pdf, punishment_factor = \
+        params_meta, noise_meta, model_confidence, dist, dv_meta_considered, likelihood, likelihood_pdf, \
+            punishment_factor = \
             self._helper_negll_meta_noisyreport(params, ignore_warnings, mock_binsize, final, return_noise,
                                                 return_criteria, return_levels, constraint_mode)
 
@@ -605,7 +606,8 @@ class ReMeta:
         # compute the probability of the actual confidence ratings given the pred confidence
         if self.cfg.meta_noise_dist.startswith('censored_'):
             if self.cfg.meta_noise_dist.endswith('gumbel'):
-                binsize_neg, binsize_pos = np.array(binsize_neg).astype(maxfloat), np.array(binsize_pos).astype(maxfloat)
+                binsize_neg = np.array(binsize_neg).astype(maxfloat)
+                binsize_pos = np.array(binsize_pos).astype(maxfloat)
             with warnings.catch_warnings():
                 warnings.simplefilter('ignore', RuntimeWarning)
                 window = (dist.cdf(np.minimum(1, self.data.confidence_2d + binsize_pos)) -
@@ -638,7 +640,7 @@ class ReMeta:
             self.model.confidence[self.model.dv_sens_considered_invalid] = np.nan
 
         return params_meta, noise_meta, self.model.confidence, dist, dv_meta_considered, likelihood, likelihood_pdf, \
-               punishment_factor
+            punishment_factor
 
     def _noise_sens_transform(self, stimuli=None, params_sens=None):
         """
@@ -883,7 +885,6 @@ def load_dataset(name, verbose=True, return_params=False, return_dv_sens=False, 
         if not cfg.skip_meta:
             print(f"{TAB}Avg. confidence: {stats['confidence']:.3f}")
             print(f"{TAB}M-Ratio: {stats['mratio']:.3f}")
-
 
     return_list = [stimuli, choices, confidence]
     if return_params:

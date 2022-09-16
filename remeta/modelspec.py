@@ -243,7 +243,8 @@ class Model(ReprMixin):
             print(f'Final neg. LL: {self.fit.fit_sens.negll:.2f}')
             if self.cfg.true_params is not None and hasattr(self.fit.fit_sens, 'negll_true'):
                 print(f'Neg. LL using true params: {self.fit.fit_sens.negll_true:.2f}')
-            print(f"Total fitting time: {self.fit.fit_sens.execution_time:.2g} secs")
+            if hasattr(self.fit.fit_sens, 'execution_time'):
+                print(f"Total fitting time: {self.fit.fit_sens.execution_time:.2g} secs")
 
     def report_fit_meta(self, verbose=True):
         if self.cfg.true_params is not None:
@@ -273,7 +274,8 @@ class Model(ReprMixin):
             if self.cfg.true_params is not None:
                 if verbose:
                     print(f'Neg. LL using true params: {self.fit.fit_meta.negll_true:.2f}')
-            print(f"Total fitting time: {self.fit.fit_meta.execution_time:.2g} secs")
+            if hasattr(self.fit.fit_meta, 'execution_time'):
+                print(f"Total fitting time: {self.fit.fit_meta.execution_time:.2g} secs")
 
     def summary(self, extended=False, fun_meta=None, confidence_gen=None, confidence_emp=None):
 
@@ -336,7 +338,6 @@ class Model(ReprMixin):
                     aic_true=2*self.cfg.paramset_meta.nparams + 2*self.fit.fit_meta.negll_true,
                     bic_true=2*np.log(self.nsamples) + 2*self.fit.fit_meta.negll_true
                 )
-
 
             if extended:
                 likelihood_01 = fun_meta(self.fit.fit_meta.x, mock_binsize=0.1)[1]

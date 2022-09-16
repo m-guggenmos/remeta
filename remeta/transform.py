@@ -389,7 +389,7 @@ def link_function(dv_meta, link_fun, evidence_bias_mult_postnoise_meta=1, confid
                 with warnings.catch_warnings():
                     # when constraints are tested, equal-value criterions may be tested, leading to a 'divide-by-zero'
                     # warning; we ignore it, as affected criterions will be invalidated by a subsequent constraint
-                    warnings.simplefilter('ignore' if constraint_mode else 'default')
+                    warnings.simplefilter('ignore' if constraint_mode else 'default')  # noqa
                     # compute slopes up until the last (real) criterion:
                     slopes_neg = [(level_neg[i] - level_neg[i - 1]) / (crit0inf_neg[i] - crit0inf_neg[i - 1])
                                   for i in range(1, len(critt_neg) + 1)]
@@ -426,7 +426,7 @@ def link_function(dv_meta, link_fun, evidence_bias_mult_postnoise_meta=1, confid
                 with warnings.catch_warnings():
                     # when constraints are tested equal-value criterions may be tested, leading to a 'divide-by-zero'
                     # warning; we ignore it, as affected criterions will be invalidated by a subsequent constraint
-                    warnings.simplefilter('ignore' if constraint_mode else 'default')
+                    warnings.simplefilter('ignore' if constraint_mode else 'default')  # noqa
                     slopes_neg = [(level_neg[i] - level_neg[i - 1]) /
                                   (crit0inf_neg[i] - crit0inf_neg[i - 1]) for i in range(1, len(critt_neg) + 1)]
                     slopes_pos = [(level_pos[i] - level_pos[i - 1]) /
@@ -483,8 +483,10 @@ def link_function(dv_meta, link_fun, evidence_bias_mult_postnoise_meta=1, confid
     else:
         raise ValueError(f'{link_fun} is not a valid link function for the metacognitive type noisy-report')
 
-    confidence_pred[dv_sens < 0] = confidence_pred[dv_sens < 0] * confidence_bias_mult_meta_[0] + confidence_bias_add_meta_[0]
-    confidence_pred[dv_sens >= 0] = confidence_pred[dv_sens >= 0] * confidence_bias_mult_meta_[1] + confidence_bias_add_meta_[1]
+    confidence_pred[dv_sens < 0] = confidence_pred[dv_sens < 0] * confidence_bias_mult_meta_[0] + \
+        confidence_bias_add_meta_[0]
+    confidence_pred[dv_sens >= 0] = confidence_pred[dv_sens >= 0] * confidence_bias_mult_meta_[1] + \
+        confidence_bias_add_meta_[1]
     confidence_pred = np.maximum(0, np.minimum(1, confidence_pred))
 
     return confidence_pred
@@ -580,8 +582,8 @@ def link_function_inv(confidence, link_fun, evidence_bias_mult_postnoise_meta=1,
                                      'provided.')
             else:
                 noise_sens = _noise_sens_transform_pc(
-                    stimuli, dv_sens, evidence_bias_mult_postnoise_meta=evidence_bias_mult_postnoise_meta_, noise_sens=noise_sens,
-                    noise_transform_sens=noise_transform_sens,
+                    stimuli, dv_sens, evidence_bias_mult_postnoise_meta=evidence_bias_mult_postnoise_meta_,
+                    noise_sens=noise_sens, noise_transform_sens=noise_transform_sens,
                     function_noise_transform_sens=function_noise_transform_sens,
                 )
             dv_meta = (2 * np.sqrt(3) * noise_sens / np.pi) * np.arctanh(confidence)

@@ -9,7 +9,6 @@ from .util import ReprMixin, _slsqp_epsilon
 from importlib.util import find_spec
 
 
-
 @dataclass
 class Configuration(ReprMixin):
     """

@@ -129,7 +129,8 @@ def simu_data(nsubjects, nsamples, params, cfg=None, stimuli_ext=None, verbose=T
         ncrit_meta = int(cfg.meta_link_function.split('_')[0])
         if 'criteria_meta' not in params:
             if cfg.enable_criteria_meta == 2:
-                params['criteria_meta'] = [[params[f'criterion{i}_meta'][j] for i in range(ncrit_meta)] for j in range(2)]
+                params['criteria_meta'] = [[params[f'criterion{i}_meta'][j] for i in range(ncrit_meta)] for j in
+                                           range(2)]
             else:
                 params['criteria_meta'] = [params[f'criterion{i}_meta'] for i in range(ncrit_meta)]
             for i in range(ncrit_meta):
@@ -193,7 +194,6 @@ def simu_data(nsubjects, nsamples, params, cfg=None, stimuli_ext=None, verbose=T
             dv_meta = np.maximum(0, dist.rvs((nsubjects, nsamples)))
         else:
             dv_meta = dv_meta_prenoise
-
 
         confidence_prenoise = link_function(
             dv_meta=dv_meta, link_fun=cfg.meta_link_function, dv_sens=dv_sens, stimuli=stimuli_final,
