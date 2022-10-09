@@ -74,7 +74,7 @@ class Configuration(ReprMixin):
         biased results and is therefore discouraged.
     enable_evidence_bias_add_meta : int (default: 0)
         Fit an additive metacognitive bias loading on sensory evidence.
-    evidence_bias_mult_meta : int (default: 0)
+    evidence_bias_mult_meta : int (default: 1)
         Fit a multiplicative metacognitive bias loading on evidence. In the case of a criterion-based link function,
         multiple parameters are fitted for each criterion/confidence level.
     evidence_bias_mult_postnoise_meta : int (default: 0)
