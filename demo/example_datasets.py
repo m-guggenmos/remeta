@@ -14,9 +14,10 @@ import gzip
 # mode = 'meta_simple'
 # mode = 'meta_complex'
 # mode = 'meta_add'
+mode = 'meta_exp'
 # mode = 'noisy_readout'
 # mode = 'criteria'
-mode = 'criteria_levels'
+# mode = 'criteria_levels'
 
 def conf(x, bounds):
     confidence = np.full(x.shape, np.nan)
@@ -76,6 +77,20 @@ elif mode == 'meta_add':
     )
     cfg = remeta.Configuration()
     cfg.enable_evidence_bias_add_meta = 1
+elif mode == 'meta_exp':
+    nsamples = 5000
+    seed = 1
+    stimuli_stepsize = 0.25
+    params = dict(
+        noise_sens=1.4,
+        bias_sens=-0.1,
+        noise_meta=0.1,
+        evidence_bias_mult_meta=0.8,
+        confidence_bias_exp_meta=1.5,
+    )
+    cfg = remeta.Configuration()
+    cfg.enable_evidence_bias_mult_meta = 1
+    cfg.enable_confidence_bias_exp_meta = 1
 elif mode == 'meta_complex':
     nsamples = 5000
     seed = 1
@@ -163,28 +178,28 @@ print(f'Saved to {path}')
 # import bz2
 # import lzma
 # import timeit
-# t0 = timeit.default_timer()
+# t1 = timeit.default_timer()
 # with gzip.open(path, "wb") as f:
 #     pickle.dump(save, f)
-# print(f'[write, gz] {timeit.default_timer() - t0:.4f} secs')
-# t0 = timeit.default_timer()
+# print(f'[write, gz] {timeit.default_timer() - t1:.4f} secs')
+# t1 = timeit.default_timer()
 # with bz2.BZ2File(path.replace('.pkl.gz', '.pkl.bz2'), 'wb') as f:
 #     pickle.dump(save, f)
-# print(f'[write, bz2] {timeit.default_timer() - t0:.4f} secs')
-# t0 = timeit.default_timer()
+# print(f'[write, bz2] {timeit.default_timer() - t1:.4f} secs')
+# t1 = timeit.default_timer()
 # with lzma.open(path.replace('.pkl.gz', '.pkl.xz'), "wb") as f:
 #     pickle.dump(save, f)
-# print(f'[write, lzma] {timeit.default_timer() - t0:.4f} secs')
+# print(f'[write, lzma] {timeit.default_timer() - t1:.4f} secs')
 #
-# t0 = timeit.default_timer()
+# t1 = timeit.default_timer()
 # with gzip.open(path, "rb") as f:
 #     pickle.load(f)
-# print(f'[read, gz] {timeit.default_timer() - t0:.4f} secs')
-# t0 = timeit.default_timer()
+# print(f'[read, gz] {timeit.default_timer() - t1:.4f} secs')
+# t1 = timeit.default_timer()
 # with bz2.BZ2File(path.replace('.pkl.gz', '.pkl.bz2'), 'rb') as f:
 #     pickle.load(f)
-# print(f'[read, bz2] {timeit.default_timer() - t0:.4f} secs')
-# t0 = timeit.default_timer()
+# print(f'[read, bz2] {timeit.default_timer() - t1:.4f} secs')
+# t1 = timeit.default_timer()
 # with lzma.open(path.replace('.pkl.xz', '.pkl.xz'), "rb") as f:
 #     pickle.load(f)
-# print(f'[read, lzma] {timeit.default_timer() - t0:.4f} secs')
+# print(f'[read, lzma] {timeit.default_timer() - t1:.4f} secs')
