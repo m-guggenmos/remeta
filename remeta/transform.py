@@ -252,9 +252,8 @@ def noise_meta_transform(confidence_or_dv_meta, dv_sens=None, noise_meta=None, n
     #                   'Setting minimal noise_meta = 0.001')
     return noise_meta_transformed
 
-
 def link_function(dv_meta, link_fun, evidence_bias_mult_postnoise_meta=1, confidence_bias_mult_meta=1,
-                  confidence_bias_add_meta=0, criteria_meta=None, levels_meta=None,
+                  confidence_bias_add_meta=0, confidence_bias_exp_meta=1, criteria_meta=None, levels_meta=None,
                   noise_sens=None, noise_transform_sens=None, function_noise_transform_sens='linear',
                   dv_sens=None, stimuli=None, constraint_mode=False, nchannels=10,
                   **kwargs):  # noqa
@@ -277,6 +276,8 @@ def link_function(dv_meta, link_fun, evidence_bias_mult_postnoise_meta=1, confid
         Multiplicative metacognitive bias parameter loading on confidence.
     confidence_bias_add_meta : float or array-like
         Additive metacognitive bias parameter loading on confidence.
+    confidence_bias_exp_meta : float or array-like
+        Exponential metacognitive bias parameter loading on confidence.
     criteria_meta : array-like
         Confidence criteria in case of a criterion-based link function.
     levels_meta : array-like
@@ -316,6 +317,7 @@ def link_function(dv_meta, link_fun, evidence_bias_mult_postnoise_meta=1, confid
     evidence_bias_mult_postnoise_meta_ = _check_param(evidence_bias_mult_postnoise_meta)
     confidence_bias_mult_meta_ = _check_param(confidence_bias_mult_meta)
     confidence_bias_add_meta_ = _check_param(confidence_bias_add_meta)
+    confidence_bias_exp_meta_ = _check_param(confidence_bias_exp_meta)
     if criteria_meta is not None:
         criteria_meta_ = _check_criteria(criteria_meta)
     if levels_meta is not None:
@@ -483,17 +485,17 @@ def link_function(dv_meta, link_fun, evidence_bias_mult_postnoise_meta=1, confid
     else:
         raise ValueError(f'{link_fun} is not a valid link function for the metacognitive type noisy-report')
 
-    confidence_pred[dv_sens < 0] = confidence_pred[dv_sens < 0] * confidence_bias_mult_meta_[0] + \
-        confidence_bias_add_meta_[0]
-    confidence_pred[dv_sens >= 0] = confidence_pred[dv_sens >= 0] * confidence_bias_mult_meta_[1] + \
-        confidence_bias_add_meta_[1]
+    confidence_pred[dv_sens < 0] = (confidence_pred[dv_sens < 0] ** confidence_bias_exp_meta_[0]) * \
+        confidence_bias_mult_meta_[0] + confidence_bias_add_meta_[0]
+    confidence_pred[dv_sens >= 0] = (confidence_pred[dv_sens >= 0] ** confidence_bias_exp_meta_[1]) * \
+        confidence_bias_mult_meta_[1] + confidence_bias_add_meta_[1]
     confidence_pred = np.maximum(0, np.minimum(1, confidence_pred))
 
     return confidence_pred
 
 
 def link_function_inv(confidence, link_fun, evidence_bias_mult_postnoise_meta=1, confidence_bias_mult_meta=1,
-                      confidence_bias_add_meta=0, criteria_meta=None,
+                      confidence_bias_add_meta=0, confidence_bias_exp_meta=1, criteria_meta=None,
                       levels_meta=None, noise_sens=None, noise_transform_sens=None,
                       function_noise_transform_sens='linear', dv_sens=None, stimuli=None,
                       **kwargs):  ## noqa
@@ -516,6 +518,8 @@ def link_function_inv(confidence, link_fun, evidence_bias_mult_postnoise_meta=1,
         Multiplicative metacognitive bias parameter loading on confidence.
     confidence_bias_add_meta : float or array-like
         Additive metacognitive bias parameter loading on confidence.
+    confidence_bias_exp_meta : float or array-like
+        Exponential metacognitive bias parameter loading on confidence.
     criteria_meta : array-like
         Confidence criteria in case of a criterion-based link function.
     levels_meta : array-like
@@ -552,9 +556,10 @@ def link_function_inv(confidence, link_fun, evidence_bias_mult_postnoise_meta=1,
     evidence_bias_mult_postnoise_meta_ = _check_param(evidence_bias_mult_postnoise_meta)
     confidence_bias_add_meta_ = _check_param(confidence_bias_add_meta)
     confidence_bias_mult_meta_ = _check_param(confidence_bias_mult_meta)
+    confidence_bias_exp_meta_ = _check_param(confidence_bias_exp_meta)
 
-    confidence[dv_sens < 0] = (confidence[dv_sens < 0] - confidence_bias_add_meta_[0]) / confidence_bias_mult_meta_[0]
-    confidence[dv_sens >= 0] = (confidence[dv_sens >= 0] - confidence_bias_add_meta_[1]) / confidence_bias_mult_meta_[1]
+    confidence[dv_sens < 0] = ((confidence[dv_sens < 0] - confidence_bias_add_meta_[0]) / confidence_bias_mult_meta_[0]) ** (1 / confidence_bias_mult_meta_[0])
+    confidence[dv_sens >= 0] = ((confidence[dv_sens >= 0] - confidence_bias_add_meta_[1]) / confidence_bias_mult_meta_[1]) ** (1 / confidence_bias_mult_meta_[1])
     confidence = np.minimum(1, confidence)
 
     if link_fun in ['tanh', 'erf', 'alg', 'guder', 'linear', 'logistic3']:
