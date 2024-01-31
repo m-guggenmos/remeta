@@ -51,7 +51,7 @@ class Configuration(ReprMixin):
     * Each setting can take the values 0, 1 or 2:
     *    0: Disable parameter.
     *    1: Enable parameter.
-    *    2: Enable parameter and fit separate values for the negative and positive stimulus modality (in the case of
+    *    2: Enable parameter and fit separate values for the negative and positive stimulus category (in the case of
     *       sensory parameters, indicated by the suffix '_sens') or negative and positive decision values (in the
     *       case of metacognitive parameters, indicated by the suffix '_meta').
     enable_warping_sens : int (default: 0)
@@ -103,7 +103,7 @@ class Configuration(ReprMixin):
     * Sensible default values are provided for all parameters. To tweak those, one can either define an entire
     * ParameterSet, which is a container for a set of parameters, or each parameter individually. Note that the
     * parameters must be either defined as a Parameter instance or as List[Parameter] in case when separate values are
-    * fitted for the positive and negative stimulus modality/decision value).
+    * fitted for the positive and negative stimulus category/decision value).
     paramset_sens : ParameterSet
         Parameter set for the sensory level.
     paramset_meta : ParameterSet
