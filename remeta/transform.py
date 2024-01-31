@@ -558,8 +558,8 @@ def link_function_inv(confidence, link_fun, evidence_bias_mult_postnoise_meta=1,
     confidence_bias_mult_meta_ = _check_param(confidence_bias_mult_meta)
     confidence_bias_exp_meta_ = _check_param(confidence_bias_exp_meta)
 
-    confidence[dv_sens < 0] = ((confidence[dv_sens < 0] - confidence_bias_add_meta_[0]) / confidence_bias_mult_meta_[0]) ** (1 / confidence_bias_mult_meta_[0])
-    confidence[dv_sens >= 0] = ((confidence[dv_sens >= 0] - confidence_bias_add_meta_[1]) / confidence_bias_mult_meta_[1]) ** (1 / confidence_bias_mult_meta_[1])
+    confidence[dv_sens < 0] = ((confidence[dv_sens < 0] - confidence_bias_add_meta_[0]) / confidence_bias_mult_meta_[0]) ** (1 / confidence_bias_exp_meta_[0])
+    confidence[dv_sens >= 0] = ((confidence[dv_sens >= 0] - confidence_bias_add_meta_[1]) / confidence_bias_mult_meta_[1]) ** (1 / confidence_bias_exp_meta_[1])
     confidence = np.minimum(1, confidence)
 
     if link_fun in ['tanh', 'erf', 'alg', 'guder', 'linear', 'logistic3']:
