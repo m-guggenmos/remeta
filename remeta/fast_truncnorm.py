@@ -22,7 +22,7 @@ import numpy as np
 import scipy.special as sc
 from numpy import (arange, putmask, ravel, ones, shape, ndarray, zeros, floor,
                    logical_and, log, sqrt, place, argmax, vectorize, asarray,
-                   nan, inf, NINF, empty)
+                   nan, inf, empty)
 from scipy import integrate
 from scipy import optimize
 from scipy._lib import doccer
@@ -115,7 +115,7 @@ def argsreduce(cond, *args):
 
     """
     newargs = np.atleast_1d(*args)
-    if not isinstance(newargs, list):
+    if not isinstance(newargs, (list, tuple)):
         newargs = [newargs, ]
     expand_arr = (cond == cond)
     return [np.extract(cond, arr1 * expand_arr) for arr1 in newargs]
@@ -1244,7 +1244,8 @@ class rv_continuous(rv_generic):
         args, loc, scale = self._parse_args(*args, **kwds)
         x, loc, scale = map(asarray, (x, loc, scale))
         args = tuple(map(asarray, args))
-        dtyp = np.find_common_type([x.dtype, np.float64], [])
+        # dtyp = np.find_common_type([x.dtype, np.float64], [])
+        dtyp = np.promote_types(x.dtype, np.float64)
         x = np.asarray((x - loc)/scale, dtype=dtyp)
         cond0 = self._argcheck(*args) & (scale > 0)
         cond1 = self._support_mask(x, *args) & (scale > 0)
@@ -1286,13 +1287,14 @@ class rv_continuous(rv_generic):
         args, loc, scale = self._parse_args(*args, **kwds)
         x, loc, scale = map(asarray, (x, loc, scale))
         args = tuple(map(asarray, args))
-        dtyp = np.find_common_type([x.dtype, np.float64], [])
+        # dtyp = np.find_common_type([x.dtype, np.float64], [])
+        dtyp = np.promote_types(x.dtype, np.float64)
         x = np.asarray((x - loc)/scale, dtype=dtyp)
         cond0 = self._argcheck(*args) & (scale > 0)
         cond1 = self._support_mask(x, *args) & (scale > 0)
         cond = cond0 & cond1
         output = empty(shape(cond), dtyp)
-        output.fill(NINF)
+        output.fill(-np.inf)
         putmask(output, (1-cond0)+np.isnan(x), self.badvalue)
         if np.any(cond):
             goodargs = argsreduce(cond, *((x,)+args+(scale,)))
@@ -1328,7 +1330,8 @@ class rv_continuous(rv_generic):
         _a, _b = self._get_support(*args)
         x, loc, scale = map(asarray, (x, loc, scale))
         args = tuple(map(asarray, args))
-        dtyp = np.find_common_type([x.dtype, np.float64], [])
+        # dtyp = np.find_common_type([x.dtype, np.float64], [])
+        dtyp = np.promote_types(x.dtype, np.float64)
         x = np.asarray((x - loc)/scale, dtype=dtyp)
         cond0 = self._argcheck(*args) & (scale > 0)
         cond1 = self._open_support_mask(x, *args) & (scale > 0)
@@ -1370,14 +1373,15 @@ class rv_continuous(rv_generic):
         _a, _b = self._get_support(*args)
         x, loc, scale = map(asarray, (x, loc, scale))
         args = tuple(map(asarray, args))
-        dtyp = np.find_common_type([x.dtype, np.float64], [])
+        # dtyp = np.find_common_type([x.dtype, np.float64], [])
+        dtyp = np.promote_types(x.dtype, np.float64)
         x = np.asarray((x - loc)/scale, dtype=dtyp)
         cond0 = self._argcheck(*args) & (scale > 0)
         cond1 = self._open_support_mask(x, *args) & (scale > 0)
         cond2 = (x >= _b) & cond0
         cond = cond0 & cond1
         output = empty(shape(cond), dtyp)
-        output.fill(NINF)
+        output.fill(-np.inf)
         place(output, (1-cond0)*(cond1 == cond1)+np.isnan(x), self.badvalue)
         place(output, cond2, 0.0)
         if np.any(cond):  # call only if at least 1 entry
@@ -1413,7 +1417,8 @@ class rv_continuous(rv_generic):
         _a, _b = self._get_support(*args)
         x, loc, scale = map(asarray, (x, loc, scale))
         args = tuple(map(asarray, args))
-        dtyp = np.find_common_type([x.dtype, np.float64], [])
+        # dtyp = np.find_common_type([x.dtype, np.float64], [])
+        dtyp = np.promote_types(x.dtype, np.float64)
         x = np.asarray((x - loc)/scale, dtype=dtyp)
         cond0 = self._argcheck(*args) & (scale > 0)
         cond1 = self._open_support_mask(x, *args) & (scale > 0)
@@ -1458,14 +1463,15 @@ class rv_continuous(rv_generic):
         _a, _b = self._get_support(*args)
         x, loc, scale = map(asarray, (x, loc, scale))
         args = tuple(map(asarray, args))
-        dtyp = np.find_common_type([x.dtype, np.float64], [])
+        # dtyp = np.find_common_type([x.dtype, np.float64], [])
+        dtyp = np.promote_types(x.dtype, np.float64)
         x = np.asarray((x - loc)/scale, dtype=dtyp)
         cond0 = self._argcheck(*args) & (scale > 0)
         cond1 = self._open_support_mask(x, *args) & (scale > 0)
         cond2 = cond0 & (x <= _a)
         cond = cond0 & cond1
         output = empty(shape(cond), dtyp)
-        output.fill(NINF)
+        output.fill(-np.inf)
         place(output, (1-cond0)+np.isnan(x), self.badvalue)
         place(output, cond2, 0.0)
         if np.any(cond):
@@ -2168,7 +2174,7 @@ class rv_discrete(rv_generic):
         cond1 = (k >= _a) & (k <= _b) & self._nonzero(k, *args)
         cond = cond0 & cond1
         output = empty(shape(cond), 'd')
-        output.fill(NINF)
+        output.fill(-np.inf)
         place(output, (1-cond0) + np.isnan(k), self.badvalue)
         if np.any(cond):
             goodargs = argsreduce(cond, *((k,)+args))
@@ -2247,7 +2253,7 @@ class rv_discrete(rv_generic):
         cond2 = (k >= _b)
         cond = cond0 & cond1
         output = empty(shape(cond), 'd')
-        output.fill(NINF)
+        output.fill(-np.inf)
         place(output, (1-cond0) + np.isnan(k), self.badvalue)
         place(output, cond2*(cond0 == cond0), 0.0)
 
@@ -2330,7 +2336,7 @@ class rv_discrete(rv_generic):
         cond2 = (k < _a) & cond0
         cond = cond0 & cond1
         output = empty(shape(cond), 'd')
-        output.fill(NINF)
+        output.fill(-np.inf)
         place(output, (1-cond0) + np.isnan(k), self.badvalue)
         place(output, cond2, 0.0)
         if np.any(cond):
