@@ -282,7 +282,7 @@ def plot_psychometric(choices, stimuli, params, cfg=None, detection_model=False,
     plt.ylabel('Choice probability $S^+$')
     ax.xaxis.set_major_formatter(FormatStrFormatter('%.2g'))
     leg = plt.legend(bbox_to_anchor=(1.02, 1), loc="upper left", fontsize=9, handlelength=0.5)
-    for lh in leg.legendHandles:
+    for lh in (leg.legendHandles if hasattr(leg, 'legendHandles') else leg.legend_handles):
         if hasattr(lh, '_legmarker'):
             lh._legmarker.set_alpha(1)  # noqa
         elif hasattr(lh, 'legmarker'):
