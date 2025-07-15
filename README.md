@@ -115,7 +115,7 @@ _Type 2 (metacognitive) parameters:_
 - `evidence_bias_add_meta`: additive metacognitive bias applying at the level of evidence
 - `confidence_bias_mult_meta`: multiplicative metacognitive bias applying at the level of confidence
 - `confidence_bias_add_meta`: additive metacognitive bias applying at the level of confidence
-- `confidence_bias_exp_meta`: exponential metacognitive bias applying at the level of confidence
+- `confidence_bias_pow_meta`: power-law metacognitive bias applying at the level of confidence
 - `noise_transform_meta`: (experimental) parameter to specify decision-value-dependent type 2 noise (e.g. multiplicative noise)
 - `criterion{i}_meta`: i-th confidence criterion (in case of a criterion-based link function)
 - `level{i}_meta`: i-th confidence level (in case of a criterion-based link function, confidence levels correspond to the confidence at the respective criteria)
