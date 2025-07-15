@@ -14,7 +14,7 @@ import gzip
 # mode = 'meta_simple'
 # mode = 'meta_complex'
 # mode = 'meta_add'
-mode = 'meta_exp'
+mode = 'meta_pow'
 # mode = 'noisy_readout'
 # mode = 'criteria'
 # mode = 'criteria_levels'
@@ -77,7 +77,7 @@ elif mode == 'meta_add':
     )
     cfg = remeta.Configuration()
     cfg.enable_evidence_bias_add_meta = 1
-elif mode == 'meta_exp':
+elif mode == 'meta_pow':
     nsamples = 5000
     seed = 1
     stimuli_stepsize = 0.25
@@ -86,11 +86,12 @@ elif mode == 'meta_exp':
         bias_sens=-0.1,
         noise_meta=0.1,
         evidence_bias_mult_meta=0.8,
-        confidence_bias_exp_meta=1.5,
+        confidence_bias_pow_meta=1.5,
     )
     cfg = remeta.Configuration()
+    cfg.meta_noise_type = 'noisy_readout'
     cfg.enable_evidence_bias_mult_meta = 1
-    cfg.enable_confidence_bias_exp_meta = 1
+    cfg.enable_confidence_bias_pow_meta = 1
 elif mode == 'meta_complex':
     nsamples = 5000
     seed = 1
