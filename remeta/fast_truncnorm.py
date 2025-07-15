@@ -27,7 +27,13 @@ from scipy import integrate
 from scipy import optimize
 from scipy._lib import doccer
 from scipy._lib._util import check_random_state
-from scipy.misc import derivative
+from packaging.version import Version
+import scipy
+# Since scipy 1.15, derivative function has moved from scipy.misc to scipy.differentiate
+if Version(scipy.__version__) >= Version("1.15"):
+    from scipy.differentiate import derivative
+else:
+    from scipy.misc import derivative
 from scipy.special import (entr)
 from scipy.stats._constants import _XMAX
 
