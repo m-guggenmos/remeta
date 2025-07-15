@@ -85,7 +85,7 @@ class Configuration(ReprMixin):
         Fit a multiplicative metacognitive bias loading on confidence.
     enable_confidence_bias_add_meta : int (default: 0)
         Fit an additive metacognitive bias loading on confidence.
-    enable_confidence_bias_exp_meta : int (default: 1)
+    enable_confidence_bias_pow_meta : int (default: 1)
         Fit an exponential metacognitive bias loading on confidence.
     enable_criteria_meta : int (default: 0)
         Fit criteria for a criterion-based link function. Note that the number of criteria is set via the link function
@@ -133,7 +133,7 @@ class Configuration(ReprMixin):
         Parameter for multiplicative metacognitive bias loading on confidence.
     confidence_bias_add_meta : Union[Parameter, List[Parameter]]
         Parameter for additive metacognitive bias loading on confidence.
-    confidence_bias_exp_meta : Union[Parameter, List[Parameter]]
+    confidence_bias_pow_meta : Union[Parameter, List[Parameter]]
         Parameter for an exponential metacognitive bias loading on confidence.
     criterion{x}_meta : Union[Parameter, List[Parameter]]
         Parameter for the xth confidence criterion (0-based).
@@ -240,7 +240,7 @@ class Configuration(ReprMixin):
     enable_evidence_bias_add_meta: int = 0
     enable_confidence_bias_mult_meta: int = 0
     enable_confidence_bias_add_meta: int = 0
-    enable_confidence_bias_exp_meta: int = 0
+    enable_confidence_bias_pow_meta: int = 0
     enable_criteria_meta: int = 0
     enable_levels_meta: int = 0
     # Experimental:
@@ -263,7 +263,7 @@ class Configuration(ReprMixin):
     evidence_bias_mult_postnoise_meta: Union[Parameter, List[Parameter]] = None
     confidence_bias_mult_meta: Union[Parameter, List[Parameter]] = None
     confidence_bias_add_meta: Union[Parameter, List[Parameter]] = None
-    confidence_bias_exp_meta: Union[Parameter, List[Parameter]] = None
+    confidence_bias_pow_meta: Union[Parameter, List[Parameter]] = None
 
     constraints_sens_callable: Callable = None
     constraints_meta_callable: Callable = None
@@ -307,7 +307,7 @@ class Configuration(ReprMixin):
     _noise_sens_default: Parameter = Parameter(guess=0.1, bounds=(1e-3, 100), grid_range=np.arange(0.1, 0.9, 0.25))
     _thresh_sens_default: Parameter = Parameter(guess=0, bounds=(0, 1), grid_range=np.arange(0, 0.41, 0.2))
     _bias_sens_default: Parameter = Parameter(guess=0, bounds=(-1, 1), grid_range=np.arange(-0.1, 0.11, 0.1))
-    _noise_meta_default: Parameter = Parameter(guess=0.2, bounds=(1e-2, 1), grid_range=np.arange(0.05, 1, 0.1))
+    _noise_meta_default: Parameter = Parameter(guess=0.2, bounds=(1e-2, 1), grid_range=np.arange(0.05           , 1, 0.1))
     _noise_transform_meta_default: Parameter = Parameter(guess=0, bounds=(0, 10),
                                                          grid_range=np.arange(0, 1.1, 0.25))
     _evidence_bias_mult_meta_default: Parameter = Parameter(guess=1, bounds=(0.5, 2),
@@ -320,7 +320,7 @@ class Configuration(ReprMixin):
                                                               grid_range=np.arange(0.5, 2.01, 0.3))
     _confidence_bias_add_meta_default: Parameter = Parameter(guess=0, bounds=(-1, 1),
                                                              grid_range=np.arange(-0.3, 0.31, 0.15))
-    _confidence_bias_exp_meta_default: Parameter = Parameter(guess=1, bounds=(0.2, 5),
+    _confidence_bias_pow_meta_default: Parameter = Parameter(guess=1, bounds=(0.2, 5),
                                                              grid_range=np.arange(0.5, 2.1, 0.25))
     _criterion_meta_default: Parameter = Parameter(guess=0, bounds=(1e-6, 50),
                                                    grid_range=np.exp(np.linspace(0, np.log(2), 8)) - 0.9)
@@ -454,7 +454,7 @@ class Configuration(ReprMixin):
             param_names_meta = []
             params_meta = ('noise', 'noise_transform', 'evidence_bias_mult', 'evidence_bias_add',
                            'evidence_bias_mult_postnoise', 'confidence_bias_mult', 'confidence_bias_add',
-                           'confidence_bias_exp')
+                           'confidence_bias_pow')
             for param in params_meta:
                 if getattr(self, f'enable_{param}_meta'):
                     param_names_meta += [f'{param}_meta']
