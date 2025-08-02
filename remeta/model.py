@@ -321,14 +321,7 @@ class ReMeta:
         if return_noise:
             return noise_sens
 
-        if self.cfg.detection_model:
-            p_active = np.tanh(np.abs(dv_sens) / noise_sens)  # probability that a channel is active
-            dv_congruent = np.sign(dv_sens) == np.sign(stimuli_final)
-            p_correct = (dv_congruent * (1 - 0.5 * (1 - p_active) ** self.cfg.detection_model_nchannels) +
-                         ~dv_congruent * 0.5 * (1 - p_active) ** self.cfg.detection_model_nchannels)
-            posterior = (self.data.stimulus_ids == 1) * p_correct + (self.data.stimulus_ids == 0) * (1 - p_correct)
-        else:
-            posterior = logistic(dv_sens, noise_sens)
+        posterior = logistic(dv_sens, noise_sens)
         choiceprob = (self.data.choices == 1) * posterior + (self.data.choices == 0) * (1 - posterior)
         negll = np.sum(-np.log(np.maximum(choiceprob, self.cfg.min_likelihood_sens)))
 
@@ -498,7 +491,7 @@ class ReMeta:
             else:
                 likelihood_pdf = None
 
-        if not self.cfg.detection_model and not self.cfg.experimental_include_incongruent_dv:
+        if not self.cfg.experimental_include_incongruent_dv:
             likelihood[self.model.dv_sens_considered_invalid] = np.nan
 
         return params_meta, noise_meta, dist, dv_meta_considered, likelihood, \
@@ -647,7 +640,7 @@ class ReMeta:
             else:
                 likelihood_pdf = None
 
-        if not self.cfg.detection_model and not self.cfg.experimental_include_incongruent_dv:
+        if not self.cfg.experimental_include_incongruent_dv:
             likelihood[self.model.dv_sens_considered_invalid] = np.nan
             self.model.confidence[self.model.dv_sens_considered_invalid] = np.nan
 
@@ -695,7 +688,7 @@ class ReMeta:
         return link_function(
             dv_meta=dv_meta, link_fun=self.cfg.meta_link_function, dv_sens=self.model.dv_sens_considered,
             stimuli=self.model.stimuli_final, function_noise_transform_sens=self.cfg.function_noise_transform_sens,
-            nchannels=self.cfg.detection_model_nchannels, criteria_meta=criteria_meta, levels_meta=levels_meta,
+            criteria_meta=criteria_meta, levels_meta=levels_meta,
             constraint_mode=constraint_mode,
             **self.model.params_sens, **params_meta
         )
@@ -707,7 +700,7 @@ class ReMeta:
         return link_function_inv(
             confidence=confidence, link_fun=link_fun, stimuli=self.model.stimuli_final,
             dv_sens=self.model.dv_sens_considered, function_noise_transform_sens=self.cfg.function_noise_transform_sens,
-            nchannels=self.cfg.detection_model_nchannels, criteria_meta=criteria_meta, levels_meta=levels_meta,
+            criteria_meta=criteria_meta, levels_meta=levels_meta,
             **self.model.params_sens, **params_meta
         )
 
@@ -737,71 +730,36 @@ class ReMeta:
         # self.model.stimuli_final_thresh = self.model.stimuli_final - np.sign(self.model.stimuli_final) * thresh_sens
         # dv_sens_mode = (np.abs(self.model.stimuli_final) >= thresh_sens) * self.model.stimuli_final_thresh - bias_sens
 
-        if self.cfg.detection_model:
-            nchannels = self.cfg.detection_model_nchannels  # number of sensory channels
-            p_active = np.full(dv_sens_mode.shape, np.nan)  # prob. channel active
-            p_active[cond_neg] = np.tanh(np.abs(dv_sens_mode[cond_neg]) / noise_sens[cond_neg])
-            p_active[cond_pos] = np.tanh(np.abs(dv_sens_mode[cond_pos]) / noise_sens[cond_pos])
+        range_ = np.linspace(0, self.cfg.max_dv_deviation, int((self.cfg.nbins_dv + 1) / 2))[1:]
+        dv_sens_range = np.hstack((-range_[::-1], 0, range_))
+        self.model.dv_sens_considered = np.full((dv_sens_mode.shape[0], dv_sens_range.shape[0]), np.nan)
+        self.model.dv_sens_considered[cond_neg] = dv_sens_mode[cond_neg] + dv_sens_range * noise_sens[cond_neg]
+        self.model.dv_sens_considered[cond_pos] = dv_sens_mode[cond_pos] + dv_sens_range * noise_sens[cond_pos]
 
-            signs = np.sign(dv_sens_mode)
-            dv_sens_mode = signs * p_active * nchannels
-            self.model.dv_sens_considered = signs * np.tile(np.arange(0, nchannels + 1), (len(dv_sens_mode), 1))
-            self.model.dv_sens_pmf = binom(nchannels, p_active).pmf(np.abs(self.model.dv_sens_considered))
+        logistic_neg = logistic_dist(loc=dv_sens_mode[cond_neg], scale=noise_sens[cond_neg] * np.sqrt(3) / np.pi)
+        logistic_pos = logistic_dist(loc=dv_sens_mode[cond_pos], scale=noise_sens[cond_pos] * np.sqrt(3) / np.pi)
+        margin_neg = noise_sens[cond_neg] * self.cfg.max_dv_deviation / self.cfg.nbins_dv
+        margin_pos = noise_sens[cond_pos] * self.cfg.max_dv_deviation / self.cfg.nbins_dv
+        self.model.dv_sens_pmf = np.full(self.model.dv_sens_considered.shape, np.nan)
+        self.model.dv_sens_pmf[cond_neg] = (logistic_neg.cdf(self.model.dv_sens_considered[cond_neg] + margin_neg) -
+                                            logistic_neg.cdf(self.model.dv_sens_considered[cond_neg] - margin_neg))
+        self.model.dv_sens_pmf[cond_pos] = (logistic_pos.cdf(self.model.dv_sens_considered[cond_pos] + margin_pos) -
+                                            logistic_pos.cdf(self.model.dv_sens_considered[cond_pos] - margin_pos))
+        # normalize PMF
+        self.model.dv_sens_pmf = self.model.dv_sens_pmf / self.model.dv_sens_pmf.sum(axis=1).reshape(-1, 1)
+        # invalidate invalid decision values
+        if not self.cfg.experimental_include_incongruent_dv:
+            self.model.dv_sens_considered_invalid = np.sign(self.model.dv_sens_considered) != \
+                                                    np.sign(self.data.choices_2d - 0.5)
+            self.model.dv_sens_pmf[self.model.dv_sens_considered_invalid] = np.nan
 
-            # this doesn't work, possibly because the beta distribution is zero at p=0?
-            # (in contrast to the binomial distribution)
-            # nactive = p_active * nchannels
-            # ninactive = nchannels - nactive
-            # p_active_range = np.linspace(1e-5, 1-1e-5, self.cfg.nbins_dv)
-            # self.model.dv_sens_considered = signs * np.tile(p_active_range*nchannels, (len(dv_sens_mode), 1))
-            # self.model.dv_sens_pmf = beta(nactive+1, ninactive+1).pdf(p_active_range)
-
-            # signs = np.sign(dv_sens_mode)
-            # dv_sens_range = np.linspace(0, np.abs(dv_sens_mode.flatten()) +
-            #                             self.cfg.max_dv_deviation, int((self.cfg.nbins_dv))).T
-            # self.model.dv_sens_considered = signs * dv_sens_range * noise_transform_sens
-            # p_active_considered = np.tanh(np.abs(self.model.dv_sens_considered) / noise_transform_sens)
-            # nactive_considered = p_active_considered * nchannels
-            # self.model.dv_sens_pmf = binom(nchannels, p_active).pmf(np.round(nactive_considered).astype(int))
-
-            # signs = np.sign(dv_sens_mode)
-            # dv_sens_mode = signs * p_active * nchannels
-            # nactive_considered = np.tile(np.arange(0, nchannels+1), (len(dv_sens_mode), 1))
-            # self.model.dv_sens_considered = signs * noise_transform_sens * \
-            #                                 np.arctanh(np.minimum(nchannels-1e-5, nactive_considered) / nchannels)
-            # self.model.dv_sens_pmf = binom(nchannels, p_active).pmf(nactive_considered)
-
-        else:
-            range_ = np.linspace(0, self.cfg.max_dv_deviation, int((self.cfg.nbins_dv + 1) / 2))[1:]
-            dv_sens_range = np.hstack((-range_[::-1], 0, range_))
-            self.model.dv_sens_considered = np.full((dv_sens_mode.shape[0], dv_sens_range.shape[0]), np.nan)
-            self.model.dv_sens_considered[cond_neg] = dv_sens_mode[cond_neg] + dv_sens_range * noise_sens[cond_neg]
-            self.model.dv_sens_considered[cond_pos] = dv_sens_mode[cond_pos] + dv_sens_range * noise_sens[cond_pos]
-
-            logistic_neg = logistic_dist(loc=dv_sens_mode[cond_neg], scale=noise_sens[cond_neg] * np.sqrt(3) / np.pi)
-            logistic_pos = logistic_dist(loc=dv_sens_mode[cond_pos], scale=noise_sens[cond_pos] * np.sqrt(3) / np.pi)
-            margin_neg = noise_sens[cond_neg] * self.cfg.max_dv_deviation / self.cfg.nbins_dv
-            margin_pos = noise_sens[cond_pos] * self.cfg.max_dv_deviation / self.cfg.nbins_dv
-            self.model.dv_sens_pmf = np.full(self.model.dv_sens_considered.shape, np.nan)
-            self.model.dv_sens_pmf[cond_neg] = (logistic_neg.cdf(self.model.dv_sens_considered[cond_neg] + margin_neg) -
-                                                logistic_neg.cdf(self.model.dv_sens_considered[cond_neg] - margin_neg))
-            self.model.dv_sens_pmf[cond_pos] = (logistic_pos.cdf(self.model.dv_sens_considered[cond_pos] + margin_pos) -
-                                                logistic_pos.cdf(self.model.dv_sens_considered[cond_pos] - margin_pos))
-            # normalize PMF
-            self.model.dv_sens_pmf = self.model.dv_sens_pmf / self.model.dv_sens_pmf.sum(axis=1).reshape(-1, 1)
-            # invalidate invalid decision values
-            if not self.cfg.experimental_include_incongruent_dv:
-                self.model.dv_sens_considered_invalid = np.sign(self.model.dv_sens_considered) != \
-                                                        np.sign(self.data.choices_2d - 0.5)
-                self.model.dv_sens_pmf[self.model.dv_sens_considered_invalid] = np.nan
-
-            if self.cfg.experimental_likelihood:
-                # self.cfg.binsize_meta*2 is the probability for a given confidence rating assuming a uniform
-                # distribution for confidence. This 'confidence guessing model' serves as a upper bound for the
-                # negative log likelihood.
-                min_likelihood = self.cfg.binsize_meta*2*np.ones(self.model.dv_sens_pmf.shape)
-                min_likelihood_weighted_cum = np.nansum(min_likelihood * self.model.dv_sens_pmf, axis=1)
-                self.model.max_negll = -np.log(min_likelihood_weighted_cum).sum()
+        if self.cfg.experimental_likelihood:
+            # self.cfg.binsize_meta*2 is the probability for a given confidence rating assuming a uniform
+            # distribution for confidence. This 'confidence guessing model' serves as a upper bound for the
+            # negative log likelihood.
+            min_likelihood = self.cfg.binsize_meta*2*np.ones(self.model.dv_sens_pmf.shape)
+            min_likelihood_weighted_cum = np.nansum(min_likelihood * self.model.dv_sens_pmf, axis=1)
+            self.model.max_negll = -np.log(min_likelihood_weighted_cum).sum()
 
         self.model.dv_sens_considered_abs = np.abs(self.model.dv_sens_considered)
         self.model.dv_sens_mode = dv_sens_mode.flatten()
