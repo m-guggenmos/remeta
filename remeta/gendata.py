@@ -64,26 +64,8 @@ def simu_type1_responses(stimuli, params, cfg):
     dv_sens_prenoise[stimuli_final >= 0] = (np.abs(stimuli_final[stimuli_final >= 0]) > thresh_sens[1]) * \
         stimuli_final[stimuli_final >= 0] + bias_sens[1]
 
-    if cfg.detection_model:
-        nchannels = cfg.detection_model_nchannels  # number of sensory channels
-        p_active = np.tanh(np.abs(dv_sens_prenoise) / noise_sens)  # probability that a channel is active
-        active = np.repeat(p_active[:, :, None], nchannels, axis=2) > np.random.rand(*dv_sens_prenoise.shape,
-                                                                                     nchannels)
-        nactive = np.sum(active, axis=2)  # = k
-        correct = np.zeros(dv_sens_prenoise.shape)
-        correct[(nactive > 0) & (np.sign(dv_sens_prenoise) == np.sign(stimuli_final))] = 1
-        correct[(nactive > 0) & (np.sign(dv_sens_prenoise) != np.sign(stimuli_final))] = 0
-        correct[nactive == 0] = np.random.randint(0, 2, np.sum(nactive == 0))
-        stimulus_ids = (np.sign(stimuli) > 0).astype(int)
-        choices = (correct == stimulus_ids).astype(int)
-        dv_sens_prenoise = p_active * nchannels
-        dv_sens = nactive
-        # if the decision value should be in original space, use this:
-        # dv_sens = np.sign(dv_sens_prenoise) * noise_transform_sens * \
-        #     np.arctanh(np.minimum(nchannels-1e-5, nactive) / nchannels)
-    else:
-        dv_sens = dv_sens_prenoise + logistic_dist(scale=noise_sens * np.sqrt(3) / np.pi).rvs(size=stimuli.shape)
-        choices = (dv_sens >= 0).astype(int)
+    dv_sens = dv_sens_prenoise + logistic_dist(scale=noise_sens * np.sqrt(3) / np.pi).rvs(size=stimuli.shape)
+    choices = (dv_sens >= 0).astype(int)
 
     return choices, stimuli_final, dv_sens_prenoise, dv_sens
 
