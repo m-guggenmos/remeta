@@ -99,7 +99,7 @@ def simu_data(nsubjects, nsamples, params, cfg=None, stimuli_ext=None, verbose=T
         if not getattr(cfg, f'enable_{p}_sens'):
             params.pop(f'{p}_sens', None)
     for p in ('noise_transform', 'evidence_bias_mult', 'evidence_bias_add', 'evidence_bias_mult_postnoise',
-              'confidence_bias_mult', 'confidence_bias_add'):
+              'confidence_bias_mult', 'confidence_bias_add', 'confidence_bias_pow'):
         if not getattr(cfg, f'enable_{p}_meta'):
             params.pop(f'{p}_meta', None)
     if not cfg.enable_noise_sens:
