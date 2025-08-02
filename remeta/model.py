@@ -69,7 +69,7 @@ class ReMeta:
                                     noisy_readout=self._helper_negll_meta_noisyreadout)[self.cfg.meta_noise_type]
 
     def fit(self, stimuli, choices, confidence, precomputed_parameters=None, guess_meta=None, verbose=True,
-            ignore_warnings=False):
+            ignore_warnings=False, skip_meta=False):
         """
         Fit sensory and metacognitive parameters
 
@@ -99,6 +99,17 @@ class ReMeta:
         # Instantiate util.Data object and perform preprocessing of the data
         self.data = Data(self.cfg, stimuli, choices, confidence)
         self.data.preproc()
+
+        self.fit_sens(precomputed_parameters, verbose, ignore_warnings)
+
+        if self.cfg.skip_meta != skip_meta:
+            raise ValueError(f'Fit is called with skip_meta={skip_meta}, but cfg.skip_meta={self.cfg.skip_meta}')
+
+        if not self.cfg.skip_meta and not skip_meta:
+            self.fit_meta(precomputed_parameters, guess_meta, verbose, ignore_warnings)
+
+
+    def fit_sens(self, precomputed_parameters=None, verbose=True, ignore_warnings=False):
 
         if verbose:
             print('\n+++ Sensory level +++')
@@ -163,62 +174,63 @@ class ReMeta:
         # if not ignore_warnings and verbose:
         #     print_warnings(w)
 
-        if not self.cfg.skip_meta:
 
-            # compute decision values
-            self._compute_dv_sens()
+    def fit_meta(self, precomputed_parameters=None, guess_meta=None, verbose=True, ignore_warnings=False):
 
-            if verbose:
-                print('\n+++ Metacognitive level +++')
+        # compute decision values
+        self._compute_dv_sens()
 
-            args_meta = [ignore_warnings, None]
-            if precomputed_parameters is not None:
-                if not np.all([p in precomputed_parameters for p in self.cfg.paramset_meta.names]):
-                    raise ValueError('Set of precomputed metacognitive parameters is incomplete.')
-                self.model.params_meta = {p: precomputed_parameters[p] for p in self.cfg.paramset_meta.names}
-                self.model.fit.fit_meta = OptimizeResult(
-                    x=[precomputed_parameters[p] for p in self.cfg.paramset_meta.names],
-                    fun=self.fun_meta([precomputed_parameters[p] for p in self.cfg.paramset_meta.names])
-                )
-                fitinfo_meta = self.fun_meta(list(self.model.params_meta.values()), *args_meta, final=True)  # noqa
-                self.model.store_meta(*fitinfo_meta)
-            else:
-                with warnings.catch_warnings(record=True) as w:  # noqa
-                    warnings.filterwarnings('ignore', module='scipy.optimize')
-                    # prepare constraints for metacognitive parameters (which may depend on decision values)
-                    if self.cfg.paramset_meta.nparams > 0:
-                        self.cfg.paramset_meta.constraints = self.cfg.constraints_meta_callable(self)
-                        self.model.fit.fit_meta = fmincon(
-                            self.fun_meta, self.cfg.paramset_meta, args_meta, gradient_free=self.cfg.gradient_free,
-                            gridsearch=self.cfg.gridsearch, grid_multiproc=self.cfg.grid_multiproc,
-                            global_minimization=self.cfg.global_minimization,
-                            fine_gridsearch=self.cfg.fine_gridsearch,
-                            gradient_method=self.cfg.gradient_method, slsqp_epsilon=self.cfg.slsqp_epsilon,
-                            init_nelder_mead=self.cfg.init_nelder_mead,
-                            guess=guess_meta,
-                            verbose=verbose
-                        )
-                    else:
-                        self.model.fit.fit_meta = OptimizeResult(x=None)
+        if verbose:
+            print('\n+++ Metacognitive level +++')
 
-                # call once again with final=True to save the model fit
-                fitinfo_meta = self.fun_meta(self.model.fit.fit_meta.x, *args_meta, final=True)
-                self.model.store_meta(*fitinfo_meta)
+        args_meta = [ignore_warnings, None]
+        if precomputed_parameters is not None:
+            if not np.all([p in precomputed_parameters for p in self.cfg.paramset_meta.names]):
+                raise ValueError('Set of precomputed metacognitive parameters is incomplete.')
+            self.model.params_meta = {p: precomputed_parameters[p] for p in self.cfg.paramset_meta.names}
+            self.model.fit.fit_meta = OptimizeResult(
+                x=[precomputed_parameters[p] for p in self.cfg.paramset_meta.names],
+                fun=self.fun_meta([precomputed_parameters[p] for p in self.cfg.paramset_meta.names])
+            )
+            fitinfo_meta = self.fun_meta(list(self.model.params_meta.values()), *args_meta, final=True)  # noqa
+            self.model.store_meta(*fitinfo_meta)
+        else:
+            with warnings.catch_warnings(record=True) as w:  # noqa
+                warnings.filterwarnings('ignore', module='scipy.optimize')
+                # prepare constraints for metacognitive parameters (which may depend on decision values)
+                if self.cfg.paramset_meta.nparams > 0:
+                    self.cfg.paramset_meta.constraints = self.cfg.constraints_meta_callable(self)
+                    self.model.fit.fit_meta = fmincon(
+                        self.fun_meta, self.cfg.paramset_meta, args_meta, gradient_free=self.cfg.gradient_free,
+                        gridsearch=self.cfg.gridsearch, grid_multiproc=self.cfg.grid_multiproc,
+                        global_minimization=self.cfg.global_minimization,
+                        fine_gridsearch=self.cfg.fine_gridsearch,
+                        gradient_method=self.cfg.gradient_method, slsqp_epsilon=self.cfg.slsqp_epsilon,
+                        init_nelder_mead=self.cfg.init_nelder_mead,
+                        guess=guess_meta,
+                        verbose=verbose
+                    )
+                else:
+                    self.model.fit.fit_meta = OptimizeResult(x=None)
 
-            if self.cfg.true_params is not None:
-                params_true_meta = sum([[self.cfg.true_params[p]] if n == 1 else self.cfg.true_params[p] for n, p in
-                                        zip(self.cfg.paramset_meta.base_len, self.cfg.paramset_meta.base_names)],
-                                       [])
-                self.model.fit.fit_meta.negll_true = self.fun_meta(params_true_meta)
+            # call once again with final=True to save the model fit
+            fitinfo_meta = self.fun_meta(self.model.fit.fit_meta.x, *args_meta, final=True)
+            self.model.store_meta(*fitinfo_meta)
 
-            self.model.report_fit_meta(verbose)
+        if self.cfg.true_params is not None:
+            params_true_meta = sum([[self.cfg.true_params[p]] if n == 1 else self.cfg.true_params[p] for n, p in
+                                    zip(self.cfg.paramset_meta.base_len, self.cfg.paramset_meta.base_names)],
+                                   [])
+            self.model.fit.fit_meta.negll_true = self.fun_meta(params_true_meta)
 
-            self.model.params = {**self.model.params_sens, **self.model.params_meta}
+        self.model.report_fit_meta(verbose)
 
-            self.meta_is_fitted = True
+        self.model.params = {**self.model.params_sens, **self.model.params_meta}
 
-            # if not ignore_warnings:
-            #     print_warnings(w)
+        self.meta_is_fitted = True
+
+        # if not ignore_warnings:
+        #     print_warnings(w)
 
     def summary(self, extended=False, generative=True, generative_nsamples=1000):
         """
