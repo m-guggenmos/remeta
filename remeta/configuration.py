@@ -38,14 +38,6 @@ class Configuration(ReprMixin):
         Possible values: 'probability_correct', 'identity', 'tanh', 'normcdf', 'erf', 'alg', 'guder', 'linear',
                          '{x}_criteria', '{x}_criteria_linear', '{x}_criteria_linear_tanh'
                          Note: replace {x} with the number of criteria
-                         Experimental (for internal use only):
-                         'detection_model_linear', 'detection_model_mean', 'detection_model_mode',
-                         'detection_model_full', 'detection_model_ideal'
-
-    detection_model : bool
-        Experimental. Define the model as a detection model.
-    detection_model_nchannels : int
-        Defines the number of sensory channels in case of a detection model.
 
     *** Enable or disable specific parameters ***
     * Each setting can take the values 0, 1 or 2:
@@ -228,8 +220,6 @@ class Configuration(ReprMixin):
     meta_noise_type: str = 'noisy_report'
     meta_noise_dist: str = 'truncated_norm'
     meta_link_function: str = 'probability_correct'
-    detection_model: bool = False
-    detection_model_nchannels: int = 10
 
     enable_warping_sens: int = 0
     enable_noise_sens: int = 1
@@ -370,10 +360,6 @@ class Configuration(ReprMixin):
         #                   'categories leads to biased estimates (for currently unknown reasons) and is thus '
         #                   'discouraged.')
 
-        if self.detection_model and 'detection_model' not in self.meta_link_function:
-            raise ValueError('Detection Models require a compatible metacogntive link function. Choose one of: '
-                             'detection_model_linear, detection_model_mean, detection_model_mode, '
-                             'detection_model_full, detection_model_ideal')
 
         if not self.enable_criteria_meta and '_criteria' in self.meta_link_function:
             raise ValueError('A criterion-based link function was set, but confidence criteria were not enabled.')
