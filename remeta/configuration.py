@@ -320,7 +320,7 @@ class Configuration(ReprMixin):
                                                               grid_range=np.arange(0.5, 2.01, 0.3))
     _confidence_bias_add_meta_default: Parameter = Parameter(guess=0, bounds=(-1, 1),
                                                              grid_range=np.arange(-0.3, 0.31, 0.15))
-    _confidence_bias_pow_meta_default: Parameter = Parameter(guess=1, bounds=(0.2, 5),
+    _confidence_bias_pow_meta_default: Parameter = Parameter(guess=1, bounds=(0.02, 5),
                                                              grid_range=np.arange(0.5, 2.1, 0.25))
     _criterion_meta_default: Parameter = Parameter(guess=0, bounds=(1e-6, 50),
                                                    grid_range=np.exp(np.linspace(0, np.log(2), 8)) - 0.9)
