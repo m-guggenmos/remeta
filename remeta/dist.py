@@ -1,14 +1,14 @@
 import warnings
 
 import numpy as np
-from scipy.stats import norm, lognorm, beta, betaprime, gamma, uniform, gumbel_r
+from scipy.stats import norm, lognorm, beta, betaprime, gamma, invgamma, uniform, gumbel_r
 
 from .util import maxfloat
 from .fast_truncnorm import truncnorm
 
 META_NOISE_DIST = (
     'beta', 'beta_std',
-    'norm', 'gumbel', 'lognorm', 'lognorm_varstd', 'betaprime', 'gamma',
+    'norm', 'gumbel', 'lognorm', 'lognorm_varstd', 'betaprime', 'gamma', 'invgamma',
     'censored_norm', 'censored_gumbel', 'censored_lognorm', 'censored_lognorm_varstd',
     'censored_betaprime', 'censored_gamma',
     'truncated_norm', 'truncated_norm_lookup', 'truncated_norm_fit',
@@ -204,6 +204,11 @@ def get_dist(meta_noise_dist, mode, scale, meta_noise_type='noisy_report', looku
         a = (mode + np.sqrt(mode**2 + 4*scale**2))**2 / (4*scale**2)
         b = (mode + np.sqrt(mode**2 + 4*scale**2)) / (2*scale**2)
         dist = gamma(a=a, loc=0, scale=1/b)
+    elif distname == 'invgamma':
+        r = scale**2 / mode**2
+        a = (2*r+1 + np.sqrt((2*r+1)**2+8*r)) / (2*r)
+        b = mode*(a+1)
+        dist = invgamma(a=a, loc=0, scale=b)
     elif distname.startswith('truncated_'):
         if meta_noise_type == 'noisy_report':
             if distname.endswith('_lookup') and (distname.startswith('truncated_norm_') or
