@@ -100,16 +100,25 @@ class ReMeta:
         self.data = Data(self.cfg, stimuli, choices, confidence)
         self.data.preproc()
 
-        self.fit_sens(precomputed_parameters, verbose, ignore_warnings)
+        self.fit_sens(precomputed_parameters=precomputed_parameters, verbose=verbose, ignore_warnings=ignore_warnings)
 
         if self.cfg.skip_meta != skip_meta:
             raise ValueError(f'Fit is called with skip_meta={skip_meta}, but cfg.skip_meta={self.cfg.skip_meta}')
 
         if not self.cfg.skip_meta and not skip_meta:
-            self.fit_meta(precomputed_parameters, guess_meta, verbose, ignore_warnings)
+            self.fit_meta(precomputed_parameters=precomputed_parameters, guess_meta=guess_meta, verbose=verbose,
+                          ignore_warnings=ignore_warnings)
 
 
-    def fit_sens(self, precomputed_parameters=None, verbose=True, ignore_warnings=False):
+    def fit_sens(self, stimuli=None, choices=None, confidence=None, precomputed_parameters=None, verbose=True, ignore_warnings=False):
+
+        if self.data is None:
+            if stimuli is None or choices is None:
+                raise ValueError('If the data attribute of the ReMeta instance is None, at least stimuli and choices '
+                                 'have to be passed to fit_sens()')
+            else:
+                self.data = Data(self.cfg, stimuli, choices, confidence)
+                self.data.preproc()
 
         if verbose:
             print('\n+++ Sensory level +++')
@@ -174,6 +183,8 @@ class ReMeta:
         # if not ignore_warnings and verbose:
         #     print_warnings(w)
 
+        self.model.params = self.model.params_sens
+
 
     def fit_meta(self, precomputed_parameters=None, guess_meta=None, verbose=True, ignore_warnings=False):
 
@@ -225,7 +236,7 @@ class ReMeta:
 
         self.model.report_fit_meta(verbose)
 
-        self.model.params = {**self.model.params_sens, **self.model.params_meta}
+        self.model.params = ({} if self.model.params is None else self.model.params) | self.model.params_meta
 
         self.meta_is_fitted = True
 
@@ -252,7 +263,7 @@ class ReMeta:
             Information about model fit.
         """
 
-        if not self.cfg.skip_meta and generative:
+        if self.meta_is_fitted and not self.cfg.skip_meta and generative:
             gen = simu_data(generative_nsamples, self.data.nsamples, self.model.params,
                             cfg=self.cfg, stimuli_ext=self.data.stimuli, verbose=False)
         else:
@@ -581,7 +592,10 @@ class ReMeta:
         else:
             criteria_meta, levels_meta = None, None
 
-        dv_meta_considered = self._compute_dv_meta(params_meta)
+        if hasattr(self.data, 'dv_meta_considered'):
+            dv_meta_considered = self.data.dv_meta_considered
+        else:
+            dv_meta_considered = self._compute_dv_meta(params_meta)
 
         self.model.confidence = self._link_function(dv_meta_considered, params_meta, criteria_meta=criteria_meta,
                                                     levels_meta=levels_meta, constraint_mode=constraint_mode)
