@@ -61,7 +61,7 @@ class ParameterSet(ReprMixin):
 
 class Data(ReprMixin):
 
-    def __init__(self, cfg, stimuli, choices, confidence):
+    def __init__(self, cfg, stimuli=None, choices=None, confidence=None):
         """
         Container class for behavioral data.
 
@@ -81,9 +81,9 @@ class Data(ReprMixin):
         """
 
         self.cfg = cfg
-        self.stimuli_unnorm = np.array(stimuli)
-        self.choices = np.array(choices)
-        self.confidence = np.array(confidence)
+        self.stimuli_unnorm = None if stimuli is None else np.array(stimuli)
+        self.choices = None if choices is None else np.array(choices)
+        self.confidence = None if confidence is None else np.array(confidence)
 
         self.stimuli = None
         self.stimulus_ids = None
@@ -93,7 +93,7 @@ class Data(ReprMixin):
         self.stimuli_2d = None
         self.choices_2d = None
         self.confidence_2d = None
-        self.nsamples = len(self.stimuli_unnorm)
+        self.nsamples = len(self.confidence) if self.stimuli_unnorm is None else len(self.stimuli_unnorm)
 
     def preproc(self):
 
@@ -114,14 +114,14 @@ class Data(ReprMixin):
             self.stimuli = self.stimuli_unnorm
 
         self.stimuli_min = np.abs(self.stimuli).min()
-
-        if self.cfg.confidence_bounds_error > 0:
-            self.confidence[self.confidence <= self.cfg.confidence_bounds_error] = 0
-            self.confidence[self.confidence >= 1 - self.cfg.confidence_bounds_error] = 1
-
         self.stimuli_2d = self.stimuli.reshape(-1, 1)
         self.choices_2d = self.choices.reshape(-1, 1)
-        self.confidence_2d = self.confidence.reshape(-1, 1)
+
+        if self.confidence is not None:
+            if self.cfg.confidence_bounds_error > 0:
+                self.confidence[self.confidence <= self.cfg.confidence_bounds_error] = 0
+                self.confidence[self.confidence >= 1 - self.cfg.confidence_bounds_error] = 1
+            self.confidence_2d = self.confidence.reshape(-1, 1)
 
     def summary(self, full=False):
         desc = dict(
@@ -274,7 +274,7 @@ class Model(ReprMixin):
 
     def summary(self, extended=False, fun_meta=None, confidence_gen=None, confidence_emp=None):
 
-        if not self.cfg.skip_meta:
+        if not self.cfg.skip_meta and hasattr(self.fit, 'fit_meta') and self.fit.fit_meta is not None:
             confidence_mode = self.confidence[:, int((self.confidence.shape[1] - 1) / 2)]
 
             if confidence_gen is not None:
@@ -311,7 +311,7 @@ class Model(ReprMixin):
                 bic_true=2*np.log(self.nsamples) + 2*self.fit.fit_sens.negll_true
             )
 
-        if not self.cfg.skip_meta:
+        if not self.cfg.skip_meta and hasattr(self.fit, 'fit_meta') and self.fit.fit_meta is not None:
             desc.update(dict(
                 nparams_meta=self.cfg.paramset_meta.nparams,
                 params_meta=self.params_meta,
