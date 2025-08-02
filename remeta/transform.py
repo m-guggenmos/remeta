@@ -255,7 +255,7 @@ def noise_meta_transform(confidence_or_dv_meta, dv_sens=None, noise_meta=None, n
 def link_function(dv_meta, link_fun, evidence_bias_mult_postnoise_meta=1, confidence_bias_mult_meta=1,
                   confidence_bias_add_meta=0, confidence_bias_pow_meta=1, criteria_meta=None, levels_meta=None,
                   noise_sens=None, noise_transform_sens=None, function_noise_transform_sens='linear',
-                  dv_sens=None, stimuli=None, constraint_mode=False, nchannels=10,
+                  dv_sens=None, stimuli=None, constraint_mode=False,
                   **kwargs):  # noqa
     """
     Link function.
@@ -267,8 +267,6 @@ def link_function(dv_meta, link_fun, evidence_bias_mult_postnoise_meta=1, confid
     link_fun : str
         Metacognitive link function. In case of criterion-based link functions {x} refers to the number of criteria.
         Possible values: 'probability_correct', 'tanh', 'normcdf', 'erf', 'alg', 'guder', 'linear', 'identity',
-                         'detection_model_linear', 'detection_model_mean', 'detection_model_mode',
-                         'detection_model_full', 'detection_model_ideal'
                          '{x}_criteria', '{x}_criteria_linear', '{x}_criteria_linear_tanh'
     evidence_bias_mult_postnoise_meta : float or array-like
         Multiplicative metacognitive bias parameter loading on evidence, but after application of readout noise.
@@ -295,8 +293,6 @@ def link_function(dv_meta, link_fun, evidence_bias_mult_postnoise_meta=1, confid
         codes the intensity.
     constraint_mode : bool
         If True, method runs during scipy optimize constraint testing and certain warnings are ignored.
-    nchannels : int
-        Number of channels (relevant only for detection-type models).
     kwargs : dict
         Conveniance parameter to avoid an error if irrelevant parameters are passed.
 
@@ -324,8 +320,6 @@ def link_function(dv_meta, link_fun, evidence_bias_mult_postnoise_meta=1, confid
         levels_meta_ = _check_criteria(levels_meta)
     else:
         levels_meta_ = None
-    if link_fun.startswith('detection_model') and link_fun.endswith('_scaled'):
-        dv_meta = np.minimum(nchannels, evidence_bias_mult_postnoise_meta * dv_meta)
 
     if link_fun in ['tanh', 'normcdf', 'erf', 'alg', 'guder', 'linear', 'identity']:
         lf = dict(
@@ -459,29 +453,6 @@ def link_function(dv_meta, link_fun, evidence_bias_mult_postnoise_meta=1, confid
                 conf[xsign >= 0] = levels_pos[np.searchsorted(np.array(crit[1]), x[xsign >= 0])]
                 return conf
         confidence_pred = lf(dv_meta, dv_sens, criteria_meta_, levels_meta_)  # noqa
-    elif link_fun.startswith('detection_model_linear'):
-        # heuristic model: simply report the proportion of active channels
-        confidence_pred = dv_meta / nchannels
-    elif link_fun.startswith('detection_model_mean'):
-        # given your current observation, compute the probability of making a correct choice when faced with the
-        # identical experiment again *using the mean of the posterior distribution of p_active*
-        confidence_pred = 1 - (1 - (dv_meta + 1) / (nchannels + 2)) ** nchannels
-    elif link_fun.startswith('detection_model_mode'):
-        # given your current observation, compute the probability of making a correct choice when faced with the
-        # identical experiment again *using the mode of the posterior distribution of p_active*
-        confidence_pred = 1 - (1 - dv_meta / nchannels) ** nchannels
-        # noise_transform_sens = noise_sens_transform(stimuli, noise_sens, noise_transform_sens,
-        #                                             function_noise_transform_sens)
-        # confidence_pred = 1 - (1 - np.tanh(dv_meta / noise_transform_sens))**nchannels
-    elif link_fun.startswith('detection_model_full'):
-        # given your current observation, compute the probability of making a correct choice when faced with the
-        # identical experiment again *by evaluating the extended posterior distribution of p_active*
-        confidence_pred = 1 - ((fac(2 * nchannels - dv_meta) * fac(nchannels + 1)) / (
-                fac(2 * nchannels + 1) * fac(nchannels - dv_meta)))
-    elif link_fun.startswith('detection_model_ideal'):
-        confidence_pred = np.full(dv_meta.shape, np.nan)
-        confidence_pred[dv_meta == 0] = 0
-        confidence_pred[dv_meta > 0] = 1
     else:
         raise ValueError(f'{link_fun} is not a valid link function for the metacognitive type noisy-report')
 
@@ -509,8 +480,6 @@ def link_function_inv(confidence, link_fun, evidence_bias_mult_postnoise_meta=1,
     link_fun : str
         Metacognitive link function. In case of criterion-based link functions {x} refers to the number of criteria.
         Possible values: 'probability_correct', 'tanh', 'normcdf', 'erf', 'alg', 'guder', 'linear', 'identity',
-                         'detection_model_linear', 'detection_model_mean', 'detection_model_mode',
-                         'detection_model_full', 'detection_model_ideal'
                          '{x}_criteria', '{x}_criteria_linear', '{x}_criteria_linear_tanh'
     evidence_bias_mult_postnoise_meta : float or array-like
         Multiplicative metacognitive bias parameter loading on evidence, but after application of readout noise.
