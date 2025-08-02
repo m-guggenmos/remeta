@@ -216,13 +216,8 @@ class Model(ReprMixin):
         self.noise_meta = noise_meta
         self.likelihood_meta = likelihood
         self.dv_meta_considered = dv_meta_considered
-        if self.cfg.detection_model:
-            col_ind = np.round(np.abs(self.dv_sens_mode)).astype(int)
-            self.dv_meta_mode = dv_meta_considered[np.arange(len(dv_meta_considered)), col_ind]
-            self.likelihood_meta_mode = likelihood[np.arange(len(likelihood)), col_ind]
-        else:
-            self.dv_meta_mode = dv_meta_considered[:, int((dv_meta_considered.shape[1] - 1) / 2)]
-            self.likelihood_meta_mode = likelihood[:, int((likelihood.shape[1] - 1) / 2)]
+        self.dv_meta_mode = dv_meta_considered[:, int((dv_meta_considered.shape[1] - 1) / 2)]
+        self.likelihood_meta_mode = likelihood[:, int((likelihood.shape[1] - 1) / 2)]
         self.likelihood_meta_weighted_cum = likelihood_weighted_cum
         self.dv_sens_pmf_renorm = self.dv_sens_pmf / np.nansum(self.dv_sens_pmf, axis=1).reshape(-1, 1)
         self.likelihood_meta_weighted_cum_renorm = np.nansum(likelihood * self.dv_sens_pmf_renorm, axis=1)
@@ -280,11 +275,7 @@ class Model(ReprMixin):
     def summary(self, extended=False, fun_meta=None, confidence_gen=None, confidence_emp=None):
 
         if not self.cfg.skip_meta:
-            if self.cfg.detection_model:
-                confidence_mode = self.confidence[np.arange(len(self.confidence)),
-                                                  np.round(np.abs(self.dv_sens_mode)).astype(int)]
-            else:
-                confidence_mode = self.confidence[:, int((self.confidence.shape[1] - 1) / 2)]
+            confidence_mode = self.confidence[:, int((self.confidence.shape[1] - 1) / 2)]
 
             if confidence_gen is not None:
                 confidence_tiled = np.tile(confidence_emp, (confidence_gen.shape[0], 1))
