@@ -76,16 +76,6 @@ def logistic_old(x, sigma, thresh, bias):
         (np.abs(x) < thresh) * (1 / (1 + np.exp(beta * bias)))
 
 
-def posterior_detection(x, sigma, thresh, bias, nchannels):
-    y = (np.abs(x) > thresh) * x + bias
-    p_active = np.tanh(np.abs(y) / sigma)  # probability that a channel is active
-    p_correct = (np.sign(x) == np.sign(y)) * (1 - 0.5 * (1 - p_active) ** nchannels) + \
-                (np.sign(x) != np.sign(y)) * 0.5 * (1 - p_active) ** nchannels
-    stimulus_ids = (x >= 0).astype(int)
-    posterior = (stimulus_ids == 1) * p_correct + (stimulus_ids == 0) * (1 - p_correct)
-    return posterior
-
-
 def linear(x, thresh, bias):
     y = (np.abs(x) > thresh) * (x - np.sign(x) * thresh) + bias
     return y
@@ -216,14 +206,11 @@ def plot_meta_condensed(ax, s, m, m2=None, nsamples_gen=1000):
              fontsize=10, ha='center')
 
 
-def plot_psychometric_sim(data, detection_model=False, detection_model_nchannels=None, figure_paper=False):
-    plot_psychometric(data.choices, data.stimuli, data.params_sens, cfg=data.cfg, detection_model=detection_model,
-                      detection_model_nchannels=detection_model_nchannels, figure_paper=figure_paper)
+def plot_psychometric_sim(data, figure_paper=False):
+    plot_psychometric(data.choices, data.stimuli, data.params_sens, cfg=data.cfg, figure_paper=figure_paper)
 
 
-def plot_psychometric(choices, stimuli, params, cfg=None, detection_model=False,
-                      detection_model_nchannels=None,
-                      figure_paper=False,  # noqa - keep for now
+def plot_psychometric(choices, stimuli, params, cfg=None, figure_paper=False,
                       fit_only=False, highlight_fit=False):
 
     params_sens = {k: v for k, v in params.items() if k.endswith('_sens')}
@@ -240,16 +227,9 @@ def plot_psychometric(choices, stimuli, params, cfg=None, detection_model=False,
 
     xrange_neg = np.arange(-1, 0.001, 0.001)
     xrange_pos = np.arange(0.001, 1.001, 0.001)
-    if detection_model:
-        posterior_neg = posterior_detection(
-            xrange_neg, noise_sens[0], thresh_sens[0], bias_sens[0], detection_model_nchannels
-        )
-        posterior_pos = posterior_detection(
-            xrange_pos, noise_sens[1], thresh_sens[1], bias_sens[1], detection_model_nchannels
-        )
-    else:
-        posterior_neg = logistic(xrange_neg, noise_sens[0], thresh_sens[0], bias_sens[0])
-        posterior_pos = logistic(xrange_pos, noise_sens[1], thresh_sens[1], bias_sens[1])
+
+    posterior_neg = logistic(xrange_neg, noise_sens[0], thresh_sens[0], bias_sens[0])
+    posterior_pos = logistic(xrange_pos, noise_sens[1], thresh_sens[1], bias_sens[1])
 
     ax = plt.gca()
 
@@ -324,7 +304,7 @@ def plot_confidence(stimuli, confidence):
 
 def plot_link_function(stimuli, confidence, dv_sens_prenoise, params, cfg=None,
                        meta_noise_type=None, meta_noise_dist=None, meta_link_function='probability_correct',
-                       function_noise_transform_sens=None, detection_model=False,
+                       function_noise_transform_sens=None,
                        plot_data=True, plot_generative_data=True, plot_likelihood=False,
                        plot_bias_free=False, display_parameters=True,
                        var_likelihood=None, noise_meta_transformed=None, dv_range=(45, 50, 55),
@@ -339,7 +319,6 @@ def plot_link_function(stimuli, confidence, dv_sens_prenoise, params, cfg=None,
         meta_link_function = cfg.meta_link_function
         meta_noise_type = cfg.meta_noise_type
         function_noise_transform_sens = cfg.function_noise_transform_sens
-        detection_model = cfg.detection_model
     else:
         cfg = remeta.Configuration()
         # We disable parameters that are not contained in params
@@ -421,11 +400,8 @@ def plot_link_function(stimuli, confidence, dv_sens_prenoise, params, cfg=None,
             barlinecols[0].set_clip_on(False)
 
         if plot_likelihood:
-            if detection_model:
-                var_likelihood_means = [np.nanmean(var_likelihood[dv_sens_prenoise == v]) for v in vals_dv_]
-            else:
-                var_likelihood_means = [np.nanmean(var_likelihood[dv_sens_prenoise == v, dv_range[1]]) for v in
-                                        vals_dv_]
+            var_likelihood_means = [np.nanmean(var_likelihood[dv_sens_prenoise == v, dv_range[1]]) for v in
+                                    vals_dv_]
 
             for i, v in enumerate(vals_dv_):
 
@@ -576,10 +552,7 @@ def plot_confidence_dist(cfg, stimuli, confidence, params, nsamples_gen=1000,
                     likelihood_norm = likelihood / likelihood_max if likelihood_max > 0 else np.zeros(likelihood.shape)
                     likelihood_norm[likelihood_norm < 0.05] = np.nan
                     correct = np.sign(dv_sens[stimuli == v, dv][0]) == (-1, 1)[k]
-                    if cfg.detection_model:
-                        color_shade = [1]
-                    else:
-                        color_shade = [[0.175], [0], [0.175]][j]
+                    color_shade = [[0.175], [0], [0.175]][j]
                     plt.plot(v + (weighting_p[i][j] * 0.26 * likelihood_norm + 0.005) * ((1, -1)[k]),  # noqa
                              x, color=(color_model_wrong, color_model)[int(correct)] + color_shade,
                              zorder=25, lw=2.5, dashes=[(2, 1), (None, None), (None, None)][j],
@@ -628,12 +601,8 @@ def plot_sensory_meta(m, plot_subject_id=False, nsamples_gen=1000, figure_paper=
         stimuli_norm = data.stimuli_norm
         choices = data.choices
         confidence = data.confidence
-        if m.cfg.detection_model:
-            var_likelihood = dict(noisy_report=m.model.extended.confidence_mode.reshape(-1, 1),
-                                  noisy_readout=m.model.extended.dv_meta_mode.reshape(-1, 1))[m.cfg.meta_noise_type]
-        else:
-            var_likelihood = dict(noisy_report=m.model.extended.confidence,
-                                  noisy_readout=m.model.extended.dv_meta)[m.cfg.meta_noise_type]
+        var_likelihood = dict(noisy_report=m.model.extended.confidence,
+                              noisy_readout=m.model.extended.dv_meta)[m.cfg.meta_noise_type]
         likelihood_weighting = m.model.extended.dv_sens_pmf
         noise_meta_transformed = m.model.extended.noise_meta
         dv_sens = m.model.extended.dv_sens
